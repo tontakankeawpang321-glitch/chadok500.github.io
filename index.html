@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ขายที่ดิน – Public Browse + Sign-in to Post (Leaflet OSM + Geo Search)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta http-equiv="Content-Security-Policy" content="
+default-src 'self';
+script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://www.gstatic.com/firebasejs https://unpkg.com;
+script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://www.gstatic.com/firebasejs https://unpkg.com;
+style-src 'self' 'unsafe-inline' https://unpkg.com;
+img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.googleusercontent.com https://firebasestorage.googleapis.com https://*.tile.openstreetmap.org;
+connect-src 'self' https://firestore.googleapis.com https://firebasestorage.googleapis.com https://securetoken.google.com https://identitytoolkit.googleapis.com https://firebaseinstallations.googleapis.com https://oauth2.googleapis.com https://www.googleapis.com https://www.gstatic.com https://*.googleapis.com https://nominatim.openstreetmap.org https://unpkg.com;
+frame-src 'self' https://accounts.google.com https://apis.google.com https://*.firebaseapp.com https://*.web.app;
+child-src 'self' https://accounts.google.com https://apis.google.com https://*.firebaseapp.com https://*.web.app;
+font-src 'self' data:;
+worker-src 'self' blob:;
+manifest-src 'self';
+media-src 'self' blob:;
+">
+
+
+
+
+<style>
+  :root{
+    --bg:#f7f8fb; --card:#ffffff; --ink:#0f172a; --muted:#6b7280; --line:#e5e7eb;
+    --brand:#2563eb; --ok:#16a34a; --danger:#dc2626; --radius:14px; --shadow:0 10px 30px -18px rgba(2,8,23,.25);
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Arial}
+  header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;gap:12px;align-items:center;z-index:10}
+  .grow{flex:1}
+  .btn{border:0;border-radius:10px;padding:10px 14px;cursor:pointer;box-shadow:var(--shadow);background:var(--brand);color:#fff}
+  .btn.ghost{background:#eef2ff;color:#1e40af;box-shadow:none}
+  .btn.danger{background:var(--danger)}
+  .user{display:flex;align-items:center;gap:10px}
+  .avatar{width:32px;height:32px;border-radius:50%;object-fit:cover}
+  .wrap{max-width:1080px;margin:20px auto;padding:0 16px}
+  .tools{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px}
+  input[type="search"]{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .thumb{width:100%;aspect-ratio:16/10;object-fit:cover;background:#f2f3f7}
+  .meta{padding:10px 12px}
+  .meta h4{margin:0 0 6px 0;font-size:16px}
+  .muted{color:var(--muted);font-size:12px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+  .badge{display:inline-block;background:#eef2ff;color:#1e40af;border-radius:999px;padding:2px 8px;font-size:12px}
+  .hidden{display:none !important}
+  dialog{border:0;border-radius:16px;max-width:760px;width:calc(100% - 24px);padding:0;box-shadow:0 20px 60px -30px rgba(0,0,0,.35)}
+  dialog::backdrop{background:rgba(0,0,0,.35)}
+  .dlg{padding:16px}
+  .dlg h3{margin:0 0 12px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+  .field input,.field textarea,.field select{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .hint{font-size:12px;color:var(--muted)}
+  .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .slot{border:1px dashed var(--line);border-radius:10px;overflow:hidden;background:#f2f3f7;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;position:relative}
+  .slot img{width:100%;height:100%;object-fit:cover}
+  .slot input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+  .owner{display:flex;gap:8px;align-items:center}
+  .owner img{width:20px;height:20px;border-radius:50%}
+  .chip{display:inline-flex;gap:8px;align-items:center}
+  .map{height:320px;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative}
+  .geo-bar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;z-index:5000}
+  .geo-bar input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  @media (max-width:820px){ .grid2{grid-template-columns:1fr} .grid3{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+<header>
+  <div class="user" id="userBox">
+    <img class="avatar hidden" id="avatar" alt="">
+    <div id="userText" class="muted">ยังไม่ได้ลงชื่อเข้าใช้</div>
+  </div>
+  <div class="grow"></div>
+  <button id="btnSignin" class="btn">Sign in with Google</button>
+  <button id="btnSignout" class="btn danger hidden">Sign out</button>
+</header>
+
+<main class="wrap">
+  <div class="tools">
+    <input id="q" type="search" placeholder="ค้นหา: หัวเรื่อง/ทำเล/รายละเอียด/ราคา/จังหวัด...">
+    <div>
+      <button id="btnNew" class="btn hidden">+ ลงประกาศขายที่ดิน</button>
+      <span class="hint">ต้องลงชื่อเข้าใช้ก่อนจึงจะลงประกาศได้</span>
+    </div>
+  </div>
+  <section id="board" class="grid"></section>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg" id="postForm">
+    <h3 id="dlgTitle">ลงประกาศขายที่ดิน</h3>
+    <input type="hidden" id="postId">
+
+    <div class="grid2">
+      <div class="field">
+        <label>หัวเรื่องประกาศ</label>
+        <input id="title" maxlength="120" required placeholder="เช่น ขายที่ดิน 3 ไร่ ใกล้ตัวเมือง">
+      </div>
+      <div class="field">
+        <label>หมวดเอกสารสิทธิ</label>
+        <select id="category" required>
+          <option value="">เลือกหมวด</option>
+          <option>โฉนด</option>
+          <option>นส.3ก</option>
+          <option>ภบท.5</option>
+          <option>อื่นๆ</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div class="field">
+        <label>ราคา (บาท)</label>
+        <input id="price" type="number" min="0" step="1" placeholder="เช่น 3500000">
+      </div>
+      <div class="field">
+        <label>จังหวัด</label>
+        <select id="province"></select>
+      </div>
+      <div class="field">
+        <label>ทำเล/ที่ตั้ง</label>
+        <input id="location" maxlength="200" placeholder="ตำบล อำเภอ จุดเด่นใกล้เคียง">
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div class="field"><label>ไร่</label><input id="rai" type="number" min="0" step="1"></div>
+      <div class="field"><label>งาน</label><input id="ngan" type="number" min="0" step="1"></div>
+      <div class="field"><label>ตารางวา</label><input id="wah" type="number" min="0" step="1"></div>
+    </div>
+
+    <div class="field">
+      <label>เลือกพิกัดบนแผนที่ (Leaflet · OSM)</label>
+      <div id="map" class="map">
+        <div class="geo-bar">
+          <input id="geoQuery" placeholder="พิมพ์ชื่อตำบล / อำเภอ / จังหวัด (เช่น ช้างคลาน เชียงใหม่)">
+          <button id="btnGeo" type="button" class="btn">ค้นหาในแผนที่</button>
+        </div>
+      </div>
+      <div class="grid2" style="margin-top:10px">
+        <div class="field"><label>ละติจูด (lat)</label><input id="lat" type="number" step="any" placeholder="13.7563"></div>
+        <div class="field"><label>ลองจิจูด (lng)</label><input id="lng" type="number" step="any" placeholder="100.5018"></div>
+      </div>
+      <div class="hint">พิมพ์ชื่อตำบล/อำเภอ/จังหวัด แล้วกด “ค้นหาในแผนที่” หรือคลิกแผนที่/ลากพินเพื่อตั้งพิกัด</div>
+    </div>
+
+    <div class="field">
+      <label>รายละเอียด</label>
+      <textarea id="body" rows="4" placeholder="เช่น เหมาะทำโครงการ ใกล้ถนนใหญ่ ไฟฟ้า-ประปาพร้อม..."></textarea>
+    </div>
+
+    <div class="field">
+      <label>ติดต่อ</label>
+      <input id="contact" maxlength="100" placeholder="ชื่อ / เบอร์โทร / Line">
+    </div>
+
+    <div class="field">
+      <label>อัปโหลดรูป (สูงสุด 3 รูป)</label>
+      <div class="gallery" id="gallery">
+        <div class="slot"><span class="muted">รูปที่ 1</span><input type="file" accept="image/*"></div>
+        <div class="slot"><span class="muted">รูปที่ 2</span><input type="file" accept="image/*"></div>
+        <div class="slot"><span class="muted">รูปที่ 3</span><input type="file" accept="image/*"></div>
+      </div>
+      <div class="hint" id="uploadHint"></div>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="btnCancel" class="btn ghost">ยกเลิก</button>
+      <button type="button" id="btnDelete" class="btn danger hidden">ลบประกาศ</button>
+      <button type="submit" id="btnSave" class="btn">บันทึก</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-storage-compat.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+/** ===== Firebase Config ===== **/
+const firebaseConfig = {
+  apiKey: "AIzaSyBLnwRJw4oSdswLjmO5TxtHqTR3g65ctPk",
+  authDomain: "allegory-e46ef.firebaseapp.com",
+  databaseURL: "https://allegory-e46ef.firebaseio.com",
+  projectId: "allegory-e46ef",
+  storageBucket: "allegory-e46ef.appspot.com",
+  messagingSenderId: "967404797408",
+  appId: "1:967404797408:web:d4e6bc4d45e4788d9f7f85"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const st   = firebase.storage();
+
+// ✅ จำสถานะล็อกอินไว้ในเครื่อง (LOCAL)
+auth.useDeviceLanguage();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.warn);
+
+/** ===== Redirect รอบเดียว + Anti-double ===== **/
+const provider = new firebase.auth.GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
+const REDIRECT_FLAG = 'authRedirectInProgress';
+
+/** ===== DOM ===== **/
+const $ = (id)=>document.getElementById(id);
+const userText=$('userText'), avatar=$('avatar'), btnSignin=$('btnSignin'), btnSignout=$('btnSignout');
+const board=$('board'), q=$('q'), btnNew=$('btnNew');
+const dlg=$('dlg'), postForm=$('postForm'), dlgTitle=$('dlgTitle'), postId=$('postId');
+const titleIn=$('title'), categoryIn=$('category'), priceIn=$('price'), provinceIn=$('province'), locationIn=$('location');
+const raiIn=$('rai'), nganIn=$('ngan'), wahIn=$('wah');
+const latIn=$('lat'), lngIn=$('lng'), bodyIn=$('body'), contactIn=$('contact');
+const gallery=$('gallery'), uploadHint=$('uploadHint'), btnDelete=$('btnDelete'), btnCancel=$('btnCancel');
+const geoQuery=$('geoQuery'), btnGeo=$('btnGeo');
+
+let postsUnsub=null, currentUser=null, postsCache=[];
+
+/** ===== จังหวัดไทย ===== **/
+const PROVINCES = ["กรุงเทพมหานคร","กระบี่","กาญจนบุรี","กาฬสินธุ์","กำแพงเพชร","ขอนแก่น","จันทบุรี","ฉะเชิงเทรา","ชลบุรี","ชัยนาท","ชัยภูมิ","ชุมพร","เชียงราย","เชียงใหม่","ตรัง","ตราด","ตาก","นครนายก","นครปฐม","นครพนม","นครราชสีมา","นครศรีธรรมราช","นครสวรรค์","นนทบุรี","นราธิวาส","น่าน","บึงกาฬ","บุรีรัมย์","ปทุมธานี","ประจวบคีรีขันธ์","ปราจีนบุรี","ปัตตานี","พระนครศรีอยุธยา","พะเยา","พังงา","พัทลุง","พิจิตร","พิษณุโลก","เพชรบุรี","เพชรบูรณ์","แพร่","ภูเก็ต","มหาสารคาม","มุกดาหาร","แม่ฮ่องสอน","ยโสธร","ยะลา","ร้อยเอ็ด","ระนอง","ระยอง","ราชบุรี","ลพบุรี","ลำปาง","ลำพูน","เลย","ศรีสะเกษ","สกลนคร","สงขลา","สตูล","สมุทรปราการ","สมุทรสงคราม","สมุทรสาคร","สระแก้ว","สระบุรี","สิงห์บุรี","สุโขทัย","สุพรรณบุรี","สุราษฎร์ธานี","สุรินทร์","หนองคาย","หนองบัวลำภู","อ่างทอง","อุดรธานี","อุตรดิตถ์","อุทัยธานี","อุบลราชธานี"];
+(function fillProvinces(){
+  const provinceIn = document.getElementById('province');
+  provinceIn.innerHTML = `<option value="">เลือกจังหวัด</option>` + PROVINCES.map(p=>`<option>${p}</option>`).join('');
+})();
+
+/** ===== Sign-in / Sign-out ===== **/
+btnSignin.addEventListener('click', async ()=>{
+  if (sessionStorage.getItem(REDIRECT_FLAG) === '1') return; // กันคลิกซ้ำ
+  sessionStorage.setItem(REDIRECT_FLAG, '1');
+  try{ await auth.signInWithRedirect(provider); }
+  catch(e){ sessionStorage.removeItem(REDIRECT_FLAG); alert('Sign-in error: '+(e?.message||e)); console.error(e); }
+});
+btnSignout.addEventListener('click', ()=>auth.signOut());
+
+// รับผล redirect หนเดียวหลังโหลด
+window.addEventListener('load', async ()=>{
+  try{
+    const res = await auth.getRedirectResult();
+    console.log('getRedirectResult:', res?.user ? 'OK' : 'no user', res);
+  }catch(e){
+    console.error('getRedirectResult error:', e);
+    alert('Sign-in failed after redirect: '+(e?.message||e));
+  }finally{
+    sessionStorage.removeItem('authRedirectInProgress');
+  }
+});
+
+auth.onAuthStateChanged(async (user)=>{
+  currentUser = user || null;
+  if(user){
+    userText.textContent = user.displayName || user.email || 'ผู้ใช้';
+    if(user.photoURL){ avatar.src=user.photoURL; avatar.classList.remove('hidden'); } else { avatar.classList.add('hidden'); }
+    btnSignin.classList.add('hidden'); btnSignout.classList.remove('hidden');
+    btnNew.classList.remove('hidden');
+  }else{
+    userText.textContent='ยังไม่ได้ลงชื่อเข้าใช้';
+    avatar.classList.add('hidden');
+    btnSignin.classList.remove('hidden'); btnSignout.classList.add('hidden');
+    btnNew.classList.add('hidden');
+  }
+});
+
+/** ===== จำสถานะ UI (search/geo query) ===== **/
+const LS_KEYS = { q:'landapp:q', geo:'landapp:geo' };
+(function restoreUI(){
+  const qv = localStorage.getItem(LS_KEYS.q); if(qv!=null){ q.value = qv; }
+  const gv = localStorage.getItem(LS_KEYS.geo); if(gv!=null){ geoQuery.value = gv; }
+})();
+q.addEventListener('input', ()=> localStorage.setItem(LS_KEYS.q, q.value||''));
+geoQuery.addEventListener('input', ()=> localStorage.setItem(LS_KEYS.geo, geoQuery.value||''));
+
+/** ===== Public: โหลดโพสต์ + ค้นหาได้เสมอ ===== **/
+function toTotalWah(rai,ngan,wah){ const r=+rai||0,n=+ngan||0,w=+wah||0; return r*400+n*100+w; }
+function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+function card(p){
+  const canEdit = currentUser && p.uid===currentUser.uid;
+  const cover = (p.images && p.images[0]?.url) || '';
+  const sizeStr = [p.rai&&`${p.rai} ไร่`, p.ngan&&`${p.ngan} งาน`, p.wah&&`${p.wah} ตร.ว.`].filter(Boolean).join(' ') || (p.totalWah?`${p.totalWah} ตร.ว.`:'—');
+  const priceStr = p.price ? Number(p.price).toLocaleString()+' บาท' : '—';
+  const cat = p.category || '—';
+  const province = p.province || '—';
+  const locStr = p.location || '—';
+  const mapLink = (typeof p.lat==='number' && typeof p.lng==='number') ? `<a class="muted" target="_blank" href="https://www.google.com/maps?q=${p.lat},${p.lng}">ดูแผนที่</a>` : '';
+  return `
+  <article class="card" data-id="${p.id}">
+    ${cover ? `<img class="thumb" src="${cover}" alt="">` : `<div class="thumb"></div>`}
+    <div class="meta">
+      <div class="row" style="margin-bottom:6px"><span class="badge">${esc(cat)}</span><span class="muted">${esc(province)}</span></div>
+      <h4>${esc(p.title||'(ไม่มีหัวเรื่อง)')}</h4>
+      <div class="muted">ราคา: ${esc(priceStr)} · ขนาด: ${esc(sizeStr)}</div>
+      <div class="row" style="margin-top:8px">
+        <div class="owner">${p.authorPhoto?`<img src="${p.authorPhoto}" alt="">`:''}<span class="muted">${esc(p.authorName||'ผู้ใช้')} · ${esc(locStr)}</span></div>
+        <div class="chip">${mapLink} ${canEdit?`<button class="btn ghost" onclick="editPost('${p.id}')">แก้ไข</button>`:''}</div>
+      </div>
+    </div>
+  </article>`;
+}
+
+function render(list){
+  const kw=(q.value||'').trim().toLowerCase();
+  const items = !kw? list : list.filter(p=>{
+    const s = `${p.title||''} ${p.location||''} ${p.body||''} ${p.price||''} ${p.category||''} ${p.province||''}`.toLowerCase();
+    return s.includes(kw);
+  });
+  board.innerHTML = items.map(card).join('') || `<div class="muted">ยังไม่มีประกาศ</div>`;
+}
+q.addEventListener('input', ()=>render(postsCache));
+
+function startPostsListener(){
+  if(typeof postsUnsub==='function') postsUnsub();
+  postsUnsub = db.collection('posts').orderBy('createdAt','desc').limit(200)
+    .onSnapshot(s=>{
+      postsCache = s.docs.map(d=>({id:d.id,...d.data()}));
+      render(postsCache);
+    }, console.error);
+}
+startPostsListener();
+
+/** ===== Dialog & CRUD (เฉพาะผู้ล็อกอิน) ===== **/
+btnNew.addEventListener('click', ()=>{
+  if(!currentUser){ alert('โปรดลงชื่อเข้าใช้ก่อนลงประกาศ'); return; }
+  openEditor();
+});
+btnCancel.addEventListener('click', ()=>dlg.close());
+
+function bindGalleryInputs(){
+  gallery.querySelectorAll('input[type="file"]').forEach((inp, idx)=>{
+    inp.addEventListener('change', ()=>{
+      const slot = inp.parentElement;
+      const f = inp.files?.[0];
+      if(!f){ slot.innerHTML = `<span class="muted">รูปที่ ${idx+1}</span><input type="file" accept="image/*">`; return; }
+      const url = URL.createObjectURL(f);
+      slot.innerHTML = `<img src="${url}" alt="รูป ${idx+1}"><input type="file" accept="image/*">`;
+      slot.querySelector('input[type="file"]').addEventListener('change', ()=>inp.dispatchEvent(new Event('change')));
+    });
+  });
+}
+bindGalleryInputs();
+
+postForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!currentUser){ alert('โปรดลงชื่อเข้าใช้'); return; }
+  disableForm(true);
+  try{
+    const id = postId.value || null;
+    const totalWah = toTotalWah(raiIn.value,nganIn.value,wahIn.value);
+    const lat = latIn.value ? Number(latIn.value) : null;
+    const lng = lngIn.value ? Number(lngIn.value) : null;
+    const base = {
+      title:(titleIn.value||'').trim(),
+      category: categoryIn.value || '',
+      price: Number(priceIn.value||'') || null,
+      province: provinceIn.value || '',
+      location:(locationIn.value||'').trim(),
+      rai: Number(raiIn.value||'')||null, ngan: Number(nganIn.value||'')||null, wah: Number(wahIn.value||'')||null,
+      totalWah, lat: Number.isFinite(lat)?lat:null, lng: Number.isFinite(lng)?lng:null,
+      body:(bodyIn.value||'').trim(), contact:(contactIn.value||'').trim(),
+      uid: currentUser.uid, authorName: currentUser.displayName || currentUser.email || 'ผู้ใช้', authorPhoto: currentUser.photoURL || '',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const inputs = [...gallery.querySelectorAll('input[type="file"]')];
+    const files  = inputs.map(i=>i.files?.[0]).filter(Boolean).slice(0,3);
+    let images = null;
+
+    if(id){
+      const doc = await db.collection('posts').doc(id).get();
+      const prev = doc.exists ? doc.data() : {};
+      if(files.length){
+        await deleteImages(prev.images);        // ลบรูปเก่าก่อน
+        images = await uploadImages(files);
+      }else{
+        images = prev.images || [];
+      }
+      await db.collection('posts').doc(id).update({...base, images});
+    }else{
+      images = files.length ? await uploadImages(files) : [];
+      await db.collection('posts').add({
+        ...base, images, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    dlg.close();
+  }catch(err){
+    alert('บันทึกไม่สำเร็จ: '+(err?.message||err)); console.error(err);
+  }finally{ disableForm(false); resetForm(); uploadHint.textContent=''; }
+});
+
+btnDelete.addEventListener('click', async ()=>{
+  const id = postId.value; if(!id) return;
+  if(!confirm('ลบประกาศนี้ใช่ไหม?')) return;
+  disableForm(true);
+  try{
+    const doc = await db.collection('posts').doc(id).get();
+    const data = doc.exists ? doc.data() : {};
+    await deleteImages(data.images);
+    await db.collection('posts').doc(id).delete();
+    dlg.close();
+  }catch(err){
+    alert('ลบไม่สำเร็จ: '+(err?.message||err)); console.error(err);
+  }finally{ disableForm(false); resetForm(); }
+});
+
+window.editPost = async (id)=>{
+  if(!currentUser){ alert('โปรดลงชื่อเข้าใช้ก่อนแก้ไข'); return; }
+  const d = await db.collection('posts').doc(id).get();
+  if(!d.exists) return alert('ไม่พบประกาศ');
+  openEditor({id, ...d.data()});
+};
+
+/** ===== Leaflet Map (OSM) + Geo Search ===== **/
+let map, marker;
+function initMap(lat, lng){
+  const center = (Number.isFinite(lat)&&Number.isFinite(lng)) ? [lat,lng] : [13.736,100.523]; // กทม.
+  if(!map){
+    map = L.map('map').setView(center, 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    marker = L.marker(center,{draggable:true}).addTo(map);
+    marker.on('dragend', ()=>{
+      const {lat,lng} = marker.getLatLng();
+      latIn.value = lat.toFixed(6); lngIn.value = lng.toFixed(6);
+    });
+    map.on('click', (e)=>{
+      marker.setLatLng(e.latlng);
+      latIn.value = e.latlng.lat.toFixed(6); lngIn.value = e.latlng.lng.toFixed(6);
+    });
+  }else{
+    map.setView(center, 12);
+    marker.setLatLng(center);
+  }
+  function syncFromInputs(){
+    const a=parseFloat(latIn.value), b=parseFloat(lngIn.value);
+    if(isFinite(a)&&isFinite(b)){ marker.setLatLng([a,b]); map.setView([a,b], map.getZoom()); }
+  }
+  latIn.onchange = syncFromInputs; lngIn.onchange = syncFromInputs;
+  setTimeout(()=>{ map.invalidateSize(); }, 200);
+}
+
+// ค้นหา “ตำบล/อำเภอ/จังหวัด” ด้วย Nominatim (ไม่ต้อง key)
+btnGeo.addEventListener('click', async ()=>{
+  const q = (geoQuery.value||'').trim();
+  if(!q) return alert('พิมพ์ชื่อตำบล/อำเภอ/จังหวัดก่อน');
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&countrycodes=th&q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { headers: { 'Accept-Language':'th' }});
+    const data = await res.json();
+    if(!Array.isArray(data) || data.length===0) return alert('ไม่พบตำแหน่งที่ค้นหา');
+    const { lat, lon } = data[0];
+    const a = parseFloat(lat), b = parseFloat(lon);
+    if(isFinite(a)&&isFinite(b)){
+      latIn.value = a.toFixed(6); lngIn.value = b.toFixed(6);
+      if(!map) initMap(a,b);
+      marker.setLatLng([a,b]); map.setView([a,b], 13);
+    }
+  }catch(e){
+    console.error(e); alert('ค้นหาตำแหน่งไม่สำเร็จ');
+  }
+});
+
+/** ===== Helpers ===== **/
+function openEditor(post){
+  dlgTitle.textContent = post ? 'แก้ไขประกาศขายที่ดิน' : 'ลงประกาศขายที่ดิน';
+  postId.value = post?.id || '';
+  titleIn.value = post?.title || ''; categoryIn.value = post?.category || '';
+  priceIn.value = post?.price ?? ''; provinceIn.value = post?.province || ''; locationIn.value = post?.location || '';
+  raiIn.value = post?.rai ?? ''; nganIn.value = post?.ngan ?? ''; wahIn.value = post?.wah ?? '';
+  latIn.value = (typeof post?.lat==='number') ? post.lat : ''; lngIn.value = (typeof post?.lng==='number') ? post.lng : '';
+  bodyIn.value = post?.body || ''; contactIn.value = post?.contact || '';
+
+  const imgs = post?.images || [];
+  [...gallery.children].forEach((slot, i)=>{
+    const exist = imgs[i]?.url;
+    slot.innerHTML = exist
+      ? `<img src="${exist}" alt="รูป ${i+1}"><input type="file" accept="image/*">`
+      : `<span class="muted">รูปที่ ${i+1}</span><input type="file" accept="image/*">`;
+    slot.querySelector('input[type="file"]').addEventListener('change', ()=>{
+      const f = slot.querySelector('input[type="file"]').files?.[0];
+      if(!f){ slot.innerHTML=`<span class="muted">รูปที่ ${i+1}</span><input type="file" accept="image/*">`; return; }
+      const url = URL.createObjectURL(f);
+      slot.innerHTML = `<img src="${url}" alt="รูป ${i+1}"><input type="file" accept="image/*">`;
+    });
+  });
+
+  document.body.style.overflow='hidden';
+  dlg.showModal();
+  dlg.addEventListener('close', ()=>{ document.body.style.overflow=''; }, {once:true});
+  const lat = (typeof post?.lat==='number')?post.lat:parseFloat(latIn.value);
+  const lng = (typeof post?.lng==='number')?post.lng:parseFloat(lngIn.value);
+  initMap(lat, lng);
+
+  btnDelete.classList.toggle('hidden', !post);
+}
+
+function resetForm(){
+  postId.value=''; titleIn.value=''; categoryIn.value=''; priceIn.value=''; provinceIn.value=''; locationIn.value='';
+  raiIn.value=''; nganIn.value=''; wahIn.value=''; latIn.value=''; lngIn.value='';
+  bodyIn.value=''; contactIn.value='';
+  gallery.innerHTML = `
+    <div class="slot"><span class="muted">รูปที่ 1</span><input type="file" accept="image/*"></div>
+    <div class="slot"><span class="muted">รูปที่ 2</span><input type="file" accept="image/*"></div>
+    <div class="slot"><span class="muted">รูปที่ 3</span><input type="file" accept="image/*"></div>`;
+  bindGalleryInputs();
+}
+
+function disableForm(b){ [...postForm.querySelectorAll('input,textarea,button,select')].forEach(x=>x.disabled=b); }
+
+async function uploadImages(files){
+  const results=[]; for(const f of files){
+    const path=`posts/${currentUser.uid}/${Date.now()}_${Math.random().toString(36).slice(2)}_${f.name}`;
+    const ref=st.ref(path); const task=ref.put(f);
+    await new Promise((resolve,reject)=>{
+      task.on('state_changed', snap=>{
+        uploadHint.textContent = `อัปโหลด ${(snap.bytesTransferred/Math.max(1,snap.totalBytes)*100).toFixed(0)}%`;
+      }, reject, resolve);
+    });
+    const url=await ref.getDownloadURL(); results.push({url, path});
+  } return results;
+}
+
+async function deleteImages(images){
+  if (!images || !Array.isArray(images)) return;
+  await Promise.allSettled(
+    images.map(img => {
+      if (img && img.path) { return st.ref(img.path).delete(); }
+      return Promise.resolve();
+    })
+  );
+}
+</script>
+
+<!-- Firestore/Storage Rules (อ้างอิง):
+Firestore:
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}
+Storage:
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /posts/{userId}/{fileName=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+-->
+</body>
+</html>
