@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>Manual Car Simulator (Legacy • WebGL1) – Three.js r120</title>
+<title>Manual Car Simulator (Legacy Compact • 512px Controls) – Three.js r120</title>
 <style>
   :root{
     --bg:#0b1020; --card:#0f162d; --ink:#e7eefc; --muted:#95a3c7; --accent:#6ee7b7; --warn:#f87171; --brand:#60a5fa;
@@ -15,39 +15,46 @@
   #app{position:fixed;inset:0;display:grid;grid-template-rows:1fr auto}
   canvas{display:block}
 
-  .hud{position:fixed;left:12px;top:12px;display:flex;gap:12px;flex-wrap:wrap;z-index:10}
-  .panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.2));border:1px solid var(--line);border-radius:16px;padding:10px 12px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
-  .stat h4{margin:0 0 6px 0;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
-  .stat .v{font-variant-numeric:tabular-nums;font-size:22px;font-weight:700}
+  .hud{position:fixed;left:8px;top:8px;display:flex;gap:8px;flex-wrap:wrap;z-index:10}
+  .panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.2));border:1px solid var(--line);border-radius:12px;padding:8px 10px;backdrop-filter:blur(6px);box-shadow:0 8px 20px rgba(0,0,0,.25)}
+  .stat h4{margin:0 0 4px 0;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .stat .v{font-variant-numeric:tabular-nums;font-size:18px;font-weight:700}
 
-  .dock{position:fixed;left:0;right:0;bottom:0;padding:12px;display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:end;z-index:9}
-  .card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.18));border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-
-  .steerBox{display:flex;justify-content:center;align-items:center;gap:20px;flex-wrap:wrap;}
-  .wheel{width:var(--wheelSize);height:var(--wheelSize);border-radius:50%;border:10px solid var(--brand);position:relative;background:radial-gradient(ellipse at center, rgba(255,255,255,.06), rgba(0,0,0,.2));-webkit-user-select:none;user-select:none;transform:rotate(0deg)}
-  .wheel:after{content:"";position:absolute;left:50%;top:50%;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);background:var(--ink)}
-  .wheel .spoke{position:absolute;left:50%;top:50%;width:4px;height:38%;background:var(--ink);transform-origin:50% 100%;border-radius:2px;opacity:.9}
+  /* === Compact control layout (512px container) === */
+  .dock{position:fixed;left:0;right:0;bottom:0;padding:10px 12px;display:flex;justify-content:center;z-index:9}
+  .controlPad{
+    width:512px; max-width:100%; 
+    background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.18));
+    border:1px solid var(--line); border-radius:16px; padding:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+    display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:center;
+  }
+  .wheelBox{display:flex;justify-content:center;align-items:center;}
+  .wheel{width:var(--wheelSize);height:var(--wheelSize);border-radius:50%;border:8px solid var(--brand);position:relative;background:radial-gradient(ellipse at center, rgba(255,255,255,.06), rgba(0,0,0,.2));-webkit-user-select:none;user-select:none;transform:rotate(0deg)}
+  .wheel:after{content:"";position:absolute;left:50%;top:50%;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);background:var(--ink)}
+  .wheel .spoke{position:absolute;left:50%;top:50%;width:3px;height:36%;background:var(--ink);transform-origin:50% 100%;border-radius:2px;opacity:.9}
   .wheel .spoke:nth-child(1){transform:translate(-50%,-100%) rotate(0deg)}
   .wheel .spoke:nth-child(2){transform:translate(-50%,-100%) rotate(120deg)}
   .wheel .spoke:nth-child(3){transform:translate(-50%,-100%) rotate(240deg)}
 
-  .pRow{display:flex;gap:10px;justify-content:center;margin-top:10px}
-  .pBtn{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);font-weight:900;cursor:pointer;-webkit-user-select:none;user-select:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 6px 10px rgba(0,0,0,.25)}
+  .controlsRight{display:grid;grid-template-rows:auto auto;gap:8px}
+  .shifter{position:relative;width:100%;height:160px;margin:0 auto;-webkit-user-select:none;user-select:none}
+  .gate{position:absolute;left:8px;right:8px;top:8px;bottom:8px;border-radius:14px;border:1px dashed var(--line);display:grid;grid-template-columns:56px repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:14px;padding:14px}
+  .slot{position:absolute;width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--chip);display:grid;place-items:center;font-weight:800;font-size:14px}
+  .slot.on{outline:2px solid var(--accent)} .slot.r{outline:2px solid var(--warn)}
+  .knob{position:absolute;width:50px;height:50px;border-radius:50%;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.3), rgba(0,0,0,.2));border:2px solid rgba(255,255,255,.15);box-shadow:0 6px 18px rgba(0,0,0,.45);display:grid;place-items:center;font-weight:900;font-size:14px}
+
+  .pRow{display:flex;gap:8px;justify-content:center}
+  .pBtn{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);font-weight:900;cursor:pointer;-webkit-user-select:none;user-select:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 6px 10px rgba(0,0,0,.25); font-size:14px}
   .pBtn[data-pressed="1"]{outline:2px solid var(--accent);background:rgba(110,231,183,.18)}
   .pBtn.brake[data-pressed="1"]{outline:2px solid var(--warn);background:rgba(248,113,113,.12)}
 
-  .shifter{position:relative;width:280px;max-width:100%;height:200px;margin:0 auto 8px;-webkit-user-select:none;user-select:none}
-  .gate{position:absolute;left:8px;right:8px;top:8px;bottom:8px;border-radius:16px;border:1px dashed var(--line);display:grid;grid-template-columns:64px repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:18px;padding:18px}
-  .slot{position:absolute;width:48px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--chip);display:grid;place-items:center;font-weight:800}
-  .slot.on{outline:2px solid var(--accent)} .slot.r{outline:2px solid var(--warn)}
-  .knob{position:absolute;width:58px;height:58px;border-radius:50%;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.3), rgba(0,0,0,.2));border:2px solid rgba(255,255,255,.15);box-shadow:0 8px 22px rgba(0,0,0,.45);display:grid;place-items:center;font-weight:900}
-
-  @media (max-width:820px){ .dock{grid-template-columns:1fr;} }
+  @media (max-width:560px){ :root{ --wheelSize:100px; } }
 </style>
 
 <!-- Polyfills for legacy Android WebView -->
 <script>
-// requestAnimationFrame
+// requestAnimationFrame polyfill
 (function() {
   var lastTime = 0;
   var vendors = ['ms', 'moz', 'webkit', 'o'];
@@ -57,7 +64,7 @@
       || window[vendors[x]+'CancelRequestAnimationFrame'];
   }
   if (!window.requestAnimationFrame)
-    window.requestAnimationFrame = function(callback, element) {
+    window.requestAnimationFrame = function(callback) {
       var currTime = new Date().getTime();
       var timeToCall = Math.max(0, 16 - (currTime - lastTime));
       var id = window.setTimeout(function() { callback(currTime + timeToCall); }, timeToCall);
@@ -80,13 +87,16 @@
       <div class="panel stat"><h4>Score</h4><div class="v"><span id="score">0</span></div></div>
     </div>
 
+    <!-- 512px control layout -->
     <div class="dock">
-      <div class="card steerBox"> 
-        <div id="wheel" class="wheel" aria-label="Steering wheel">
-          <div class="spoke"></div><div class="spoke"></div><div class="spoke"></div>
+      <div class="controlPad">
+        <div class="wheelBox">
+          <div id="wheel" class="wheel" aria-label="Steering wheel">
+            <div class="spoke"></div><div class="spoke"></div><div class="spoke"></div>
+          </div>
         </div>
 
-        <div>
+        <div class="controlsRight">
           <div class="shifter" id="shifter">
             <div class="gate" id="gate"></div>
           </div>
@@ -96,25 +106,21 @@
             <button id="pGas" class="pBtn" data-pressed="0" title="Gas">G</button>
           </div>
         </div>
-
       </div>
-
-      <div class="card" style="display:none"></div>
-      <div class="card" style="display:none"></div>
     </div>
   </div>
 
   <!-- Use Three.js r120 (WebGL1-friendly) -->
   <script src="https://unpkg.com/three@0.120.0/build/three.min.js"></script>
   <script>
-  // ===== Parameters (kept simple for legacy devices) =====
+  // ===== Performance dials for older phones =====
   var P = {
     maxSteerDeg: 33,
-    idle: 800, maxRpm: 7000, red: 6800, inertia: .18,
+    idle: 800, maxRpm: 7000, red: 6800, inertia: .2,
     drag:.015, roll:.02, brake:12, mass:1400, wheelR:.32,
-    gear:{'R':-3.2,'N':0,'1':3.4,'2':2.2,'3':1.52,'4':1.22,'5':1.02,'6':.82}, fd:3.55, throttleA:4.0,
+    gear:{'R':-3.2,'N':0,'1':3.4,'2':2.2,'3':1.52,'4':1.22,'5':1.02,'6':.82}, fd:3.55, throttleA:3.6,
     roadW: 8,
-    maxSpeedMS: 55,
+    maxSpeedMS: 50,
     steerReturn: 4.0
   };
 
@@ -137,7 +143,7 @@
   hold(pBrake,function(){S.braking =1;}, function(){S.braking =0;});
   pClutch.addEventListener('click', function(){ var on=pClutch.getAttribute('data-pressed')==='0'; pClutch.setAttribute('data-pressed', on?'1':'0'); S.clutch=on?1:0; elCl.textContent=Math.round(S.clutch*100)+'%'; }, false);
 
-  // ===== Steering Wheel (no DOMMatrix; keep our own rotation state) =====
+  // ===== Steering Wheel (no DOMMatrix) =====
   var wheel = document.getElementById('wheel');
   var dragging=false, startAng=0, startRot=0, visualDeg=0;
 
@@ -184,8 +190,8 @@
   // ===== Shifter =====
   var gate=document.getElementById('gate'), shifter=document.getElementById('shifter'), slots={}, layout=[{g:'R',c:0,r:0},{g:'1',c:1,r:0},{g:'2',c:1,r:1},{g:'3',c:2,r:0},{g:'4',c:2,r:1},{g:'5',c:3,r:0},{g:'6',c:3,r:1}];
   function buildSlots(){
-    var rect = gate.getBoundingClientRect(), pad=18, gw=rect.width-pad*2, gh=rect.height-pad*2;
-    var colX=[pad+32, pad+gw*(1/6), pad+gw*(3/6), pad+gw*(5/6)];
+    var rect = gate.getBoundingClientRect(), pad=14, gw=rect.width-pad*2, gh=rect.height-pad*2;
+    var colX=[pad+28, pad+gw*(1/6), pad+gw*(3/6), pad+gw*(5/6)];
     var rowY=[pad+gh*(1/4), pad+gh*(3/4)];
     var exist = gate.querySelectorAll('.slot');
     for(var k=0;k<exist.length;k++){ exist[k].parentNode.removeChild(exist[k]); }
@@ -196,10 +202,10 @@
       el.className='slot'+(it.g==='R'?' r':'');
       el.textContent=it.g;
       gate.appendChild(el);
-      var x=colX[it.c]-24, y=rowY[it.r]-24;
+      var x=colX[it.c]-21, y=rowY[it.r]-21;
       el.style.left=x+'px'; el.style.top=y+'px';
-      el.setAttribute('data-cx', (x+24));
-      el.setAttribute('data-cy', (y+24));
+      el.setAttribute('data-cx', (x+21));
+      el.setAttribute('data-cy', (y+21));
       slots[it.g]=el;
     }
   }
@@ -207,11 +213,11 @@
   function setKnobTo(gear){
     if(gear && slots[gear]){
       var cx=+slots[gear].getAttribute('data-cx'), cy=+slots[gear].getAttribute('data-cy');
-      knob.style.left=(cx-29)+'px'; knob.style.top=(cy-29)+'px'; knob.textContent=gear;
+      knob.style.left=(cx-25)+'px'; knob.style.top=(cy-25)+'px'; knob.textContent=gear;
       var all = gate.querySelectorAll('.slot'); for(var i=0;i<all.length;i++){ all[i].classList.remove('on'); }
       slots[gear].classList.add('on');
     } else {
-      var r=gate.getBoundingClientRect(); knob.style.left=(r.width/2-29)+'px'; knob.style.top=(r.height/2-29)+'px'; knob.textContent='N';
+      var r=gate.getBoundingClientRect(); knob.style.left=(r.width/2-25)+'px'; knob.style.top=(r.height/2-25)+'px'; knob.textContent='N';
       var all2 = gate.querySelectorAll('.slot'); for(var j=0;j<all2.length;j++){ all2[j].classList.remove('on'); }
     }
   }
@@ -222,21 +228,21 @@
       var d=Math.hypot ? Math.hypot(cx-x,cy-y) : Math.sqrt((cx-x)*(cx-x)+(cy-y)*(cy-y));
       if(d<dmin){dmin=d; b=g;}
     }
-    return dmin<56?b:null;
+    return dmin<48?b:null;
   }
-  function flash(){ knob.style.boxShadow='0 0 0 10px rgba(239,68,68,.5)'; setTimeout(function(){ knob.style.boxShadow=''; },150); }
+  function flash(){ knob.style.boxShadow='0 0 0 8px rgba(239,68,68,.5)'; setTimeout(function(){ knob.style.boxShadow=''; },150); }
   var draggingKnob=false, off=[0,0];
-  function kDown(x,y){ draggingKnob=true; var k=knob.getBoundingClientRect(); off=[x-k.left-29, y-k.top-29]; }
+  function kDown(x,y){ draggingKnob=true; var k=knob.getBoundingClientRect(); off=[x-k.left-25, y-k.top-25]; }
   function kMove(x,y){
     if(!draggingKnob) return;
     var r=gate.getBoundingClientRect(); var X=x-r.left-off[0], Y=y-r.top-off[1];
-    if(X<0) X=0; if(Y<0) Y=0; if(X>r.width-58) X=r.width-58; if(Y>r.height-58) Y=r.height-58;
+    if(X<0) X=0; if(Y<0) Y=0; if(X>r.width-50) X=r.width-50; if(Y>r.height-50) Y=r.height-50;
     knob.style.left=X+'px'; knob.style.top=Y+'px';
   }
   function kUp(){
     if(!draggingKnob) return; draggingKnob=false;
     var r=gate.getBoundingClientRect(), k=knob.getBoundingClientRect();
-    var X=k.left-r.left+29, Y=k.top-r.top+29;
+    var X=k.left-r.left+25, Y=k.top-r.top+25;
     var g=nearest(X,Y);
     if(g){ if(tryShift(g)) setKnobTo(g); else {flash(); setKnobTo(S.gear==='N'?null:S.gear);} }
     else setKnobTo(S.gear==='N'?null:S.gear);
@@ -257,32 +263,34 @@
     return true;
   }
 
-  // ===== Three.js Scene (WebGL1-friendly) =====
+  // ===== Three.js Scene (WebGL1-friendly + perf) =====
   var viewport=document.getElementById('viewport');
   var canvas = document.createElement('canvas');
+  canvas.addEventListener('webglcontextlost', function(e){ e.preventDefault(); }, false);
   viewport.appendChild(canvas);
 
-  var renderer=new THREE.WebGLRenderer({canvas:canvas, antialias:true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  var renderer=new THREE.WebGLRenderer({canvas:canvas, antialias:false, alpha:false, preserveDrawingBuffer:false});
+  // Lower pixel ratio to avoid lag/black on weak GPUs
+  renderer.setPixelRatio(1);
   renderer.setSize(window.innerWidth,window.innerHeight);
 
   var scene=new THREE.Scene(); scene.background=new THREE.Color(0x0b1020);
-  var camera=new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.5, 5000); camera.position.set(0,4,8);
-  scene.add(new THREE.HemisphereLight(0xffffff,0x223355,1.0));
-  var dir=new THREE.DirectionalLight(0xffffff,0.6); dir.position.set(3,6,2); dir.castShadow=false; scene.add(dir);
+  var camera=new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.5, 2500); camera.position.set(0,4,8);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x223355,0.9));
+  var dir=new THREE.DirectionalLight(0xffffff,0.55); dir.position.set(3,6,2); dir.castShadow=false; scene.add(dir);
 
   var env=new THREE.Group(); scene.add(env);
 
   function createRoadTexture() {
-    var w = 128, h = 256;
+    var w = 64, h = 128; // smaller texture
     var c = document.createElement('canvas');
     c.width = w; c.height = h;
     var ctx = c.getContext('2d');
     ctx.fillStyle = '#444444'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#E0E0E0';
-    var edge = 4;
+    var edge = 3;
     ctx.fillRect(0, 0, edge, h); ctx.fillRect(w - edge, 0, edge, h);
-    ctx.strokeStyle = '#E0E0E0'; ctx.lineWidth = 3;
+    ctx.strokeStyle = '#E0E0E0'; ctx.lineWidth = 2;
     if(ctx.setLineDash){ ctx.setLineDash([h/4, h/4]); }
     ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
     var tex = new THREE.CanvasTexture(c);
@@ -292,48 +300,49 @@
   }
   function buildRoadSingle(){
     var halfW=P.roadW/2;
-    var L = 50000;
+    var L = 20000; // shorter road
     var roadTexture = createRoadTexture();
     roadTexture.repeat.set(1, L / 10);
-    var roadMat = new THREE.MeshStandardMaterial({map: roadTexture, roughness: 0.9, metalness: 0.0});
+    var roadMat = new THREE.MeshStandardMaterial({map: roadTexture, roughness: 1.0, metalness: 0.0});
     var edgeMat=new THREE.MeshStandardMaterial({color:0x3a4a25,roughness:1});
 
     var road=new THREE.Mesh(new THREE.PlaneGeometry(P.roadW, L), roadMat);
     road.rotation.x=-Math.PI/2; road.position.y = 0; env.add(road);
 
-    var left=new THREE.Mesh(new THREE.PlaneGeometry(200, L), edgeMat);
-    left.rotation.x=-Math.PI/2; left.position.x=-halfW-100; left.position.y = -0.01; env.add(left);
+    var left=new THREE.Mesh(new THREE.PlaneGeometry(120, L), edgeMat);
+    left.rotation.x=-Math.PI/2; left.position.x=-halfW-60; left.position.y = -0.01; env.add(left);
 
-    var right=new THREE.Mesh(new THREE.PlaneGeometry(200, L), edgeMat);
-    right.rotation.x=-Math.PI/2; right.position.x= halfW+100; right.position.y = -0.01; env.add(right);
+    var right=new THREE.Mesh(new THREE.PlaneGeometry(120, L), edgeMat);
+    right.rotation.x=-Math.PI/2; right.position.x= halfW+60; right.position.y = -0.01; env.add(right);
 
-    var base=new THREE.Mesh(new THREE.PlaneGeometry(6000,6000), new THREE.MeshStandardMaterial({color:0x0f162d,roughness:1}));
+    var base=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000), new THREE.MeshStandardMaterial({color:0x0f162d,roughness:1}));
     base.rotation.x=-Math.PI/2; base.position.y = -0.02; env.add(base);
   }
   function addMountain(x,z,s,c){
-    var geo=new THREE.ConeGeometry(1,2,6), mat=new THREE.MeshStandardMaterial({color:c,roughness:.95,metalness:.05});
-    var m=new THREE.Mesh(geo,mat); m.scale.set(s*1.4,s*2.4,s*1.4); m.position.set(x,(s*2.4)/2,z); env.add(m);
+    var geo=new THREE.ConeGeometry(1,2,5); // fewer segments
+    var mat=new THREE.MeshStandardMaterial({color:c,roughness:.95,metalness:.05});
+    var m=new THREE.Mesh(geo,mat); m.scale.set(s*1.4,s*2.2,s*1.4); m.position.set(x,(s*2.2)/2,z); env.add(m);
   }
   function R(a,b){ return a + Math.random()*(b-a); }
   function buildMountains(){
     var halfW=P.roadW/2;
-    for(var k=0;k<60;k++){
+    for(var k=0;k<30;k++){ // fewer mountains
       var side=Math.random()<.5?-1:1;
-      var x=side*R(halfW+30,520), z=R(-1800,1800), s=R(3,16), col=Math.random()<.5?0x2b355c:0x223057;
+      var x=side*R(halfW+30,420), z=R(-1400,1400), s=R(3,12), col=Math.random()<.5?0x2b355c:0x223057;
       addMountain(x,z,s,col);
     }
   }
   buildRoadSingle(); buildMountains();
 
-  // ===== Car =====
+  // ===== Car (simplified wheel segments) =====
   var car=new THREE.Group(); scene.add(car);
-  var bodyMat = new THREE.MeshStandardMaterial({color:0x60a5fa,metalness:.2,roughness:.6});
+  var bodyMat = new THREE.MeshStandardMaterial({color:0x60a5fa,metalness:.1,roughness:.7});
   var body=new THREE.Mesh(new THREE.BoxGeometry(2.0,.7,4.4), bodyMat);
   body.position.y=.7/2+.4; car.add(body);
-  var roof=new THREE.Mesh(new THREE.BoxGeometry(1.6,.35,2.0), new THREE.MeshStandardMaterial({color:0x6aa9ff,metalness:.1,roughness:.2,transparent:true,opacity:.6}));
+  var roof=new THREE.Mesh(new THREE.BoxGeometry(1.6,.35,2.0), new THREE.MeshStandardMaterial({color:0x6aa9ff,metalness:.05,roughness:.25,transparent:true,opacity:.6}));
   roof.position.set(0, body.position.y+.35, -0.2); car.add(roof);
 
-  var wGeo=new THREE.CylinderGeometry(P.wheelR,P.wheelR,.26,18); wGeo.rotateZ(Math.PI/2);
+  var wGeo=new THREE.CylinderGeometry(P.wheelR,P.wheelR,.24,14); wGeo.rotateZ(Math.PI/2);
   var wMat=new THREE.MeshStandardMaterial({color:0x222831,roughness:.9});
   function mk(){ return new THREE.Mesh(wGeo,wMat); }
   var wFL=mk(); wFL.position.set(.95,P.wheelR, 1.6);
@@ -344,22 +353,22 @@
 
   function resetCar(){ S.speed=0; S.heading=0; S.pos.set(0,0,0); S.rpm=P.idle; S.gear='N'; S.clutch=0; pClutch.setAttribute('data-pressed','0'); setWheelVisual(0); }
 
-  // ===== Apples =====
+  // ===== Apples (reduced) =====
   var apples = [];
   var score = 0;
   function makeAppleMesh(){
-    var g = new THREE.SphereGeometry(0.18, 16, 16);
-    var m = new THREE.MeshStandardMaterial({color:0xd7263d, roughness:.5, metalness:.1});
+    var g = new THREE.SphereGeometry(0.16, 12, 12);
+    var m = new THREE.MeshStandardMaterial({color:0xd7263d, roughness:.6, metalness:.05});
     var apple = new THREE.Mesh(g, m);
-    var stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.12,8), new THREE.MeshStandardMaterial({color:0x2f6b2f, roughness:1}));
-    stem.position.set(0,0.24,0); apple.add(stem);
+    var stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.12,6), new THREE.MeshStandardMaterial({color:0x2f6b2f, roughness:1}));
+    stem.position.set(0,0.22,0); apple.add(stem);
     apple.castShadow=false; apple.receiveShadow=false;
     return apple;
   }
   function spawnApples(n, zMin, zMax){
-    if(typeof n==='undefined') n=40;
+    if(typeof n==='undefined') n=20;
     if(typeof zMin==='undefined') zMin=20;
-    if(typeof zMax==='undefined') zMax=2500;
+    if(typeof zMax==='undefined') zMax=1800;
     var half = P.roadW/2 - 0.6;
     for(var i=0;i<n;i++){
       var apple = makeAppleMesh();
@@ -441,9 +450,9 @@
     wFL.rotation.y = steerRadVisual; wFR.rotation.y = steerRadVisual;
     body.rotation.z = -S.steer * 0.05;
 
-    var back=new THREE.Vector3(Math.sin(car.rotation.y),0,Math.cos(car.rotation.y)).multiplyScalar(-6);
-    var camTarget=new THREE.Vector3(0,0,0).add(back).add(new THREE.Vector3(0,3,0));
-    camera.position.lerp(camTarget, 0.12);
+    var back=new THREE.Vector3(Math.sin(car.rotation.y),0,Math.cos(car.rotation.y)).multiplyScalar(-5.5);
+    var camTarget=new THREE.Vector3(0,0,0).add(back).add(new THREE.Vector3(0,2.8,0));
+    camera.position.lerp(camTarget, 0.14);
     camera.lookAt(new THREE.Vector3(0,.8,0));
 
     elSpd.textContent = (Math.abs(S.speed)*3.6).toFixed(1);
