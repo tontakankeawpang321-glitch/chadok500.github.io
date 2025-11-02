@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Manual Car Simulator (Asphalt Road • HUD • Apples) – Three.js</title>
+<style>
+  :root{
+    --bg:#0b1020; --card:#0f162d; --ink:#e7eefc; --muted:#95a3c7; --accent:#6ee7b7; --warn:#f87171; --brand:#60a5fa;
+    --line:#1b2445; --chip:#17203d;
+    --wheelSize:120px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+  #app{position:fixed;inset:0;display:grid;grid-template-rows:1fr auto}
+  canvas{display:block}
+
+  .hud{position:fixed;left:12px;top:12px;display:flex;gap:12px;flex-wrap:wrap;z-index:10}
+  .panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.2));border:1px solid var(--line);border-radius:16px;padding:10px 12px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .stat h4{margin:0 0 6px 0;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .stat .v{font-variant-numeric:tabular-nums;font-size:22px;font-weight:700}
+
+  .dock{position:fixed;inset-inline:0;bottom:0;padding:12px;display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:end;z-index:9}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.18));border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+
+  .steerBox{display:flex;justify-content:center;align-items:center;gap:20px;flex-wrap:wrap;}
+  .wheel{width:var(--wheelSize);height:var(--wheelSize);border-radius:50%;border:10px solid var(--brand);position:relative;background:radial-gradient(ellipse at center, rgba(255,255,255,.06), rgba(0,0,0,.2));touch-action:none;user-select:none;transform:rotate(0deg)}
+  .wheel:after{content:"";position:absolute;inset:50% auto auto 50%;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);background:var(--ink)}
+  .wheel .spoke{position:absolute;left:50%;top:50%;width:4px;height:38%;background:var(--ink);transform-origin:50% 100%;border-radius:2px;opacity:.9}
+  .wheel .spoke:nth-child(1){transform:translate(-50%,-100%) rotate(0deg)}
+  .wheel .spoke:nth-child(2){transform:translate(-50%,-100%) rotate(120deg)}
+  .wheel .spoke:nth-child(3){transform:translate(-50%,-100%) rotate(240deg)}
+
+  .pRow{display:flex;gap:10px;justify-content:center;margin-top:10px}
+  .pBtn{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);font-weight:900;cursor:pointer;user-select:none;touch-action:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 6px 10px rgba(0,0,0,.25)}
+  .pBtn[data-pressed="1"]{outline:2px solid var(--accent);background:rgba(110,231,183,.18)}
+  .pBtn.brake[data-pressed="1"]{outline:2px solid var(--warn);background:rgba(248,113,113,.12)}
+
+  .shifter{position:relative;width:280px;max-width:100%;height:200px;margin:0 auto 8px;user-select:none;touch-action:none}
+  .gate{position:absolute;inset:8px;border-radius:16px;border:1px dashed var(--line);display:grid;grid-template-columns:64px repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:18px;padding:18px}
+  .slot{position:absolute;width:48px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--chip);display:grid;place-items:center;font-weight:800}
+  .slot.on{outline:2px solid var(--accent)} .slot.r{outline:2px solid var(--warn)}
+  .knob{position:absolute;width:58px;height:58px;border-radius:50%;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.3), rgba(0,0,0,.2));border:2px solid rgba(255,255,255,.15);box-shadow:0 8px 22px rgba(0,0,0,.45);display:grid;place-items:center;font-weight:900}
+
+  @media (max-width:820px){ .dock{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div id="viewport"></div>
+
+    <div class="hud">
+      <div class="panel stat"><h4>Speed</h4><div class="v"><span id="spd">0.0</span> km/h</div></div>
+      <div class="panel stat"><h4>RPM</h4><div class="v"><span id="rpm">800</span> rpm</div><div style="font-size:12px;color:var(--muted)">Gear: <b id="gear">N</b> • Clutch: <b id="clutchPct">0%</b></div></div>
+      <div class="panel stat"><h4>Steer</h4><div class="v"><span id="steer">0</span>°</div></div>
+      <div class="panel stat"><h4>Score</h4><div class="v"><span id="score">0</span></div></div>
+    </div>
+
+    <div class="dock">
+      <div class="card steerBox"> 
+        <div id="wheel" class="wheel" aria-label="Steering wheel">
+          <div class="spoke"></div><div class="spoke"></div><div class="spoke"></div>
+        </div>
+
+        <div>
+          <div class="shifter" id="shifter">
+            <div class="gate" id="gate"></div>
+          </div>
+          <div class="pRow">
+            <button id="pBrake" class="pBtn brake" data-pressed="0" title="Brake">B</button>
+            <button id="pClutch" class="pBtn" data-pressed="0" title="Clutch">C</button>
+            <button id="pGas" class="pBtn" data-pressed="0" title="Gas">G</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card" style="display:none"></div>
+      <div class="card" style="display:none"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script>
+  const P = {
+    maxSteerDeg: 33,
+    idle: 800, maxRpm: 7000, red: 6800, inertia: .15,
+    drag:.015, roll:.02, brake:12, mass:1400, wheelR:.32,
+    gear:{R:-3.2,N:0,1:3.4,2:2.2,3:1.52,4:1.22,5:1.02,6:.82}, fd:3.55, throttleA:4.5,
+    roadW: 8,
+    maxSpeedMS: 70,
+    steerReturn: 4.5
+  };
+
+  const S = {speed:0, heading:0, steer:0, steerDeg:0, throttle:0, braking:0, clutch:0, gear:'N', rpm:P.idle, pos:new THREE.Vector3(0,0,0)};
+
+  const elSpd = document.getElementById('spd'), elRpm = document.getElementById('rpm'), elGear = document.getElementById('gear'), elSteer = document.getElementById('steer'), elCl = document.getElementById('clutchPct');
+  const elScore = document.getElementById('score');
+
+  const pGas=document.getElementById('pGas'), pBrake=document.getElementById('pBrake'), pClutch=document.getElementById('pClutch');
+  const hold=(el,on,off)=>{ const d=(e)=>{el.dataset.pressed='1';on(); if(el.setPointerCapture&&e.pointerId!=null) el.setPointerCapture(e.pointerId);}; const u=()=>{el.dataset.pressed='0';off();}; el.addEventListener('pointerdown',d); el.addEventListener('pointerup',u); el.addEventListener('pointercancel',u); el.addEventListener('pointerleave',u); };
+  hold(pGas, ()=>S.throttle=1, ()=>S.throttle=0);
+  hold(pBrake,()=>S.braking =1, ()=>S.braking =0);
+  pClutch.addEventListener('click', ()=>{ const on=pClutch.dataset.pressed==='0'; pClutch.dataset.pressed=on?'1':'0'; S.clutch=on?1:0; elCl.textContent=Math.round(S.clutch*100)+'%'; });
+
+  const wheel = document.getElementById('wheel');
+  let dragging=false, startAng=0, startRot=0, visualDeg=0;
+  const angle=(cx,cy,x,y)=>Math.atan2(y-cy,x-cx)*180/Math.PI;
+  function setWheelVisual(deg){
+    visualDeg = Math.max(-180, Math.min(180, deg));
+    wheel.style.transform = `rotate(${visualDeg}deg)`;
+    // ขวา=บวก ซ้าย=ลบ (UI)
+    const steer = Math.max(-1, Math.min(1, visualDeg / P.maxSteerDeg));
+    S.steer = steer;
+    S.steerDeg = Math.round(S.steer * P.maxSteerDeg);
+    elSteer.textContent = S.steerDeg;
+  }
+  const pd=(x,y)=>{ const r=wheel.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2; startAng = angle(cx,cy,x,y); const st = getComputedStyle(wheel).transform; let cur = 0; if(st!=='none'){ const m = new DOMMatrix(st); cur = Math.atan2(m.b,m.a)*180/Math.PI; } startRot = cur; dragging=true; };
+  const pm=(x,y)=>{ if(!dragging) return; const r=wheel.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2; const a=angle(cx,cy,x,y); const d=a-startAng; setWheelVisual(startRot + d); };
+  const pu=()=>dragging=false;
+  wheel.addEventListener('mousedown',e=>{e.preventDefault();pd(e.clientX,e.clientY);}); addEventListener('mousemove',e=>pm(e.clientX,e.clientY)); addEventListener('mouseup',pu);
+  wheel.addEventListener('touchstart',e=>{const t=e.changedTouches[0];pd(t.clientX,t.clientY);},{passive:true}); addEventListener('touchmove',e=>{const t=e.changedTouches[0];pm(t.clientX,t.clientY);},{passive:true}); addEventListener('touchend',pu,{passive:true});
+
+  function autoCenterSteer(dt){ if(dragging) return; const sign = visualDeg>0?1:-1; const step = P.steerReturn * dt * 60; if(Math.abs(visualDeg) <= step){ setWheelVisual(0); } else { setWheelVisual(visualDeg - sign*step); } }
+
+  const gate=document.getElementById('gate'), shifter=document.getElementById('shifter'), slots={}, layout=[{g:'R',c:0,r:0},{g:'1',c:1,r:0},{g:'2',c:1,r:1},{g:'3',c:2,r:0},{g:'4',c:2,r:1},{g:'5',c:3,r:0},{g:'6',c:3,r:1}];
+  function buildSlots(){ const rect = gate.getBoundingClientRect(), pad=18, gw=rect.width-pad*2, gh=rect.height-pad*2; const colX=[pad+32, pad+gw*(1/6), pad+gw*(3/6), pad+gw*(5/6)]; const rowY=[pad+gh*(1/4), pad+gh*(3/4)]; gate.querySelectorAll('.slot').forEach(n=>n.remove()); for(const it of layout){ const el=document.createElement('div'); el.className='slot'+(it.g==='R'?' r':''); el.textContent=it.g; gate.appendChild(el); const x=colX[it.c]-24, y=rowY[it.r]-24; el.style.left=x+'px'; el.style.top=y+'px'; el.dataset.cx=(x+24); el.dataset.cy=(y+24); slots[it.g]=el; } }
+  const knob=document.createElement('div'); knob.className='knob'; knob.textContent='N'; shifter.appendChild(knob);
+  function setKnobTo(gear){ if(gear && slots[gear]){ const cx=+slots[gear].dataset.cx, cy=+slots[gear].dataset.cy; knob.style.left=(cx-29)+'px'; knob.style.top=(cy-29)+'px'; knob.textContent=gear; Object.values(slots).forEach(s=>s.classList.remove('on')); slots[gear].classList.add('on'); } else { const r=gate.getBoundingClientRect(); knob.style.left=(r.width/2-29)+'px'; knob.style.top=(r.height/2-29)+'px'; knob.textContent='N'; Object.values(slots).forEach(s=>s.classList.remove('on')); } }
+  function nearest(x,y){ let b=null,dmin=1e9; for(const g in slots){ const cx=+slots[g].dataset.cx, cy=+slots[g].dataset.cy; const d=Math.hypot(cx-x,cy-y); if(d<dmin){dmin=d; b=g;} } return dmin<56?b:null; }
+  function flash(){ knob.style.boxShadow='0 0 0 10px rgba(239,68,68,.5)'; setTimeout(()=>knob.style.boxShadow='',150); }
+  let draggingKnob=false, off=[0,0];
+  function kDown(x,y){ draggingKnob=true; const k=knob.getBoundingClientRect(); off=[x-k.left-29, y-k.top-29]; }
+  function kMove(x,y){ if(!draggingKnob) return; const r=gate.getBoundingClientRect(); let X=x-r.left-off[0], Y=y-r.top-off[1]; X=Math.max(0,Math.min(r.width-58,X)); Y=Math.max(0,Math.min(r.height-58,Y)); knob.style.left=X+'px'; knob.style.top=Y+'px'; }
+  function kUp(){ if(!draggingKnob) return; draggingKnob=false; const r=gate.getBoundingClientRect(), k=knob.getBoundingClientRect(); const X=k.left-r.left+29, Y=k.top-r.top+29; const g=nearest(X,Y); if(g){ if(tryShift(g)) setKnobTo(g); else {flash(); setKnobTo(S.gear==='N'?null:S.gear);} } else setKnobTo(S.gear==='N'?null:S.gear); }
+  knob.addEventListener('mousedown',e=>{e.preventDefault();kDown(e.clientX,e.clientY);}); addEventListener('mousemove',e=>kMove(e.clientX,e.clientY)); addEventListener('mouseup',kUp);
+  knob.addEventListener('touchstart',e=>{const t=e.changedTouches[0];kDown(t.clientX,t.clientY);},{passive:true}); addEventListener('touchmove',e=>{const t=e.changedTouches[0];kMove(t.clientX,t.clientY);},{passive:true}); addEventListener('touchend',kUp,{passive:true});
+  setTimeout(()=>{buildSlots(); setKnobTo(null);},0);
+  addEventListener('resize', ()=>setTimeout(()=>{buildSlots(); setKnobTo(S.gear==='N'?null:S.gear);},0));
+
+  // === เข้า/สลับได้ทุกเกียร์ เมื่อคลัช >= 60% (ตามที่ขอ) ===
+  function tryShift(t){
+    if(S.clutch < .6){ flash(); return false; }
+    S.gear = t;
+    elGear.textContent = S.gear;
+    return true;
+  }
+
+  const viewport=document.getElementById('viewport');
+  const renderer=new THREE.WebGLRenderer({antialias:true, logarithmicDepthBuffer:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  viewport.appendChild(renderer.domElement);
+
+  const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0b1020);
+  const camera=new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.5, 5000); camera.position.set(0,4,8);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x223355,1.1));
+  const dir=new THREE.DirectionalLight(0xffffff,.65); dir.position.set(3,6,2); dir.castShadow=false; scene.add(dir);
+
+  const env=new THREE.Group(); scene.add(env);
+
+  // ===== Texture ถนนด้วย Canvas =====
+  function createRoadTexture() {
+    const w = 128, h = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    // 1) ผิวถนน
+    ctx.fillStyle = '#444444';
+    ctx.fillRect(0, 0, w, h);
+
+    // 2) เส้นขอบไหล่ทาง
+    ctx.fillStyle = '#E0E0E0';
+    const edgeLineWidth = 4;
+    ctx.fillRect(0, 0, edgeLineWidth, h);
+    ctx.fillRect(w - edgeLineWidth, 0, edgeLineWidth, h);
+
+    // 3) เส้นประกลางถนน
+    ctx.strokeStyle = '#E0E0E0';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([h / 4, h / 4]);
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 0);
+    ctx.lineTo(w / 2, h);
+    ctx.stroke();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }
+
+  function buildRoadSingle(){
+    const halfW=P.roadW/2;
+    const L = 100000;
+
+    const roadTexture = createRoadTexture();
+    roadTexture.repeat.set(1, L / 10);
+    const roadMat = new THREE.MeshStandardMaterial({
+      map: roadTexture,
+      roughness: 0.8,
+      metalness: 0.1
+    });
+
+    const edgeMat=new THREE.MeshStandardMaterial({color:0x3a4a25,roughness:1});
+
+    const road=new THREE.Mesh(new THREE.PlaneGeometry(P.roadW, L), roadMat);
+    road.rotation.x=-Math.PI/2;
+    road.position.y = 0;
+    env.add(road);
+
+    const left=new THREE.Mesh(new THREE.PlaneGeometry(200, L), edgeMat);
+    left.rotation.x=-Math.PI/2;
+    left.position.x=-halfW-100;
+    left.position.y = -0.01;
+    env.add(left);
+
+    const right=new THREE.Mesh(new THREE.PlaneGeometry(200, L), edgeMat);
+    right.rotation.x=-Math.PI/2;
+    right.position.x= halfW+100;
+    right.position.y = -0.01;
+    env.add(right);
+
+    const base=new THREE.Mesh(new THREE.PlaneGeometry(6000,6000), new THREE.MeshStandardMaterial({color:0x0f162d,roughness:1}));
+    base.rotation.x=-Math.PI/2;
+    base.position.y = -0.02;
+    env.add(base);
+  }
+
+  function addMountain(x,z,s,c=0x2b355c){ const geo=new THREE.ConeGeometry(1,2,6), mat=new THREE.MeshStandardMaterial({color:c,roughness:.95,metalness:.05}); const m=new THREE.Mesh(geo,mat); m.scale.set(s*1.4,s*2.4,s*1.4); m.position.set(x,(s*2.4)/2,z); env.add(m); }
+  function buildMountains(){ const halfW=P.roadW/2, R=(a,b)=>a+Math.random()*(b-a); for(let k=0;k<80;k++){ const side=Math.random()<.5?-1:1; const x=side*R(halfW+30,520), z=R(-2200,2200), s=R(3,18), col=Math.random()<.5?0x2b355c:0x223057; addMountain(x,z,s,col); } }
+  buildRoadSingle(); buildMountains();
+
+  // ===== รถ (สมจริงขึ้นเล็กน้อย: ล้อหน้าเลี้ยว, ตัวถังเอียง) =====
+  const car=new THREE.Group(); scene.add(car);
+  const bodyMat = new THREE.MeshStandardMaterial({color:0x60a5fa,metalness:.2,roughness:.6});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2.0,.7,4.4), bodyMat);
+  body.position.y=.7/2+.4; car.add(body);
+
+  // กระจก/หลังคาเรียบง่าย
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(1.6,.35,2.0), new THREE.MeshStandardMaterial({color:0x6aa9ff,metalness:.1,roughness:.2,transparent:true,opacity:.6}));
+  roof.position.set(0, body.position.y+.35, -0.2); car.add(roof);
+
+  const wGeo=new THREE.CylinderGeometry(P.wheelR,P.wheelR,.26,22); wGeo.rotateZ(Math.PI/2);
+  const wMat=new THREE.MeshStandardMaterial({color:0x222831,roughness:.9});
+  const mk=()=>new THREE.Mesh(wGeo,wMat);
+  const wFL=mk(); wFL.position.set(.95,P.wheelR, 1.6);
+  const wFR=mk(); wFR.position.set(-.95,P.wheelR, 1.6);
+  const wRL=mk(); wRL.position.set(.95,P.wheelR,-1.6);
+  const wRR=mk(); wRR.position.set(-.95,P.wheelR,-1.6);
+  car.add(wFL,wFR,wRL,wRR);
+
+  function resetCar(){ S.speed=0; S.heading=0; S.pos.set(0,0,0); S.rpm=P.idle; S.gear='N'; S.clutch=0; pClutch.dataset.pressed='0'; setWheelVisual(0); }
+
+  // ===== แอปเปิ้ล (เก็บคะแนน) =====
+  let apples = [];
+  let score = 0;
+
+  function makeAppleMesh(){
+    const g = new THREE.SphereGeometry(0.18, 18, 18);
+    const m = new THREE.MeshStandardMaterial({color:0xd7263d, roughness:.5, metalness:.1});
+    const apple = new THREE.Mesh(g, m);
+    // ก้าน
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.12,8), new THREE.MeshStandardMaterial({color:0x2f6b2f, roughness:1}));
+    stem.position.set(0,0.24,0);
+    apple.add(stem);
+    apple.castShadow=false; apple.receiveShadow=false;
+    return apple;
+  }
+
+  function spawnApples(n=40, zMin=20, zMax=2500){
+    const half = P.roadW/2 - 0.6; // วางในช่องถนน
+    for(let i=0;i<n;i++){
+      const apple = makeAppleMesh();
+      const x = (Math.random()*2-1)*half;
+      const z = Math.random()*(zMax-zMin)+zMin;
+      apple.position.set(x, P.wheelR+0.05, z);
+      apple.userData.worldPos = apple.position.clone(); // เก็บ world pos เริ่ม
+      env.add(apple);
+      apples.push(apple);
+    }
+  }
+  spawnApples();
+
+  const FIXED_DT = 1/120;
+  let acc = 0; const clock = new THREE.Clock();
+
+  function physicsStep(dt){
+    const ratio = P.gear[S.gear]*P.fd;
+    const wOmega = Math.abs(S.speed)/P.wheelR;
+    const wheelRpm = ratio!==0 ? (wOmega*60/(2*Math.PI))*Math.abs(ratio) : 0;
+    const engaged = 1 - S.clutch;
+    const target = (ratio!==0 && engaged>.01) ? wheelRpm : (P.idle + S.throttle*(P.maxRpm-P.idle));
+    S.rpm += (target-S.rpm)*Math.min(1, dt/P.inertia);
+    S.rpm = Math.max(P.idle, Math.min(P.maxRpm, S.rpm));
+
+    let a=0;
+    if(ratio!==0 && engaged>.01){
+      const gEff=Math.max(.5,Math.min(2.8,Math.abs(ratio)));
+      const sign=(S.gear==='R'?-1:1);
+      a += sign*S.throttle*P.throttleA*gEff*engaged;
+    }
+    if(S.braking>0){ a += -Math.sign(S.speed||1)*P.brake*S.braking; }
+    const resist = (P.drag*(S.speed*S.speed)) + (P.roll*(1+Math.abs(S.speed)));
+    a += -Math.sign(S.speed||1)*resist; S.speed += a*dt;
+
+    if (Math.abs(S.speed) < 0.001) S.speed = 0;
+    S.speed = Math.max(-P.maxSpeedMS, Math.min(P.maxSpeedMS, S.speed));
+
+    // === FIX ทิศทางฟิสิกส์ให้ตรงกับภาพ: ใช้ -S.steer ===
+    const steerRad = (-S.steer)*(P.maxSteerDeg*Math.PI/180);
+    const yaw = Math.tan(steerRad)*S.speed/2.5;
+    S.heading += yaw*dt;
+    if(S.heading > Math.PI) S.heading -= 2*Math.PI; else if(S.heading < -Math.PI) S.heading += 2*Math.PI;
+
+    const dir = new THREE.Vector3(Math.sin(S.heading),0,Math.cos(S.heading));
+    S.pos.addScaledVector(dir, S.speed*dt);
+
+    const margin = P.roadW/2 - 1.1;
+    if(margin > 0 && Math.abs(S.pos.x) > margin) resetCar();
+
+    const spin=(S.speed/P.wheelR)*dt;
+    wFL.rotation.x-=spin; wFR.rotation.x-=spin; wRL.rotation.x-=spin; wRR.rotation.x-=spin;
+
+    autoCenterSteer(dt);
+  }
+
+  function checkApplePickup(){
+    // car อยู่ที่ origin (0,0,0) ใน scene เพราะเราเลื่อน env = -S.pos
+    // ดังนั้นตำแหน่งแอปเปิ้ลใน scene = apple.userData.worldPos - S.pos
+    const R = 0.5; // รัศมีชนเก็บ
+    for(const a of apples){
+      if(!a.visible) continue;
+      const relX = a.userData.worldPos.x - S.pos.x;
+      const relZ = a.userData.worldPos.z - S.pos.z;
+      const d2 = relX*relX + relZ*relZ;
+      if(d2 < R*R){
+        a.visible = false;
+        score += 10;
+        elScore.textContent = score;
+      }
+    }
+  }
+
+  function renderFrame(){
+    // world follows the car
+    env.position.set(-S.pos.x, 0, -S.pos.z);
+
+    car.position.set(0,0,0);
+    car.rotation.y=S.heading;
+
+    // ===== ล้อหน้าหมุนตามพวงมาลัย (ภาพ) =====
+    const steerRadVisual = S.steer * (P.maxSteerDeg * Math.PI / 180);
+    // หลังจากแก้ฟิสิกส์ใช้ -S.steer ด้านบน ภาพตรงแล้ว: ขวา=ขวา
+    wFL.rotation.y = steerRadVisual;
+    wFR.rotation.y = steerRadVisual;
+
+    // ตัวถังเอียงตามพวงมาลัยเล็กน้อย (สมจริงขึ้น)
+    body.rotation.z = -S.steer * 0.05;
+
+    // camera follow
+    const back=new THREE.Vector3(Math.sin(car.rotation.y),0,Math.cos(car.rotation.y)).multiplyScalar(-6);
+    const camTarget=new THREE.Vector3(0,0,0).add(back).add(new THREE.Vector3(0,3,0));
+    camera.position.lerp(camTarget, 0.12);
+    camera.lookAt(new THREE.Vector3(0,.8,0));
+
+    elSpd.textContent = (Math.abs(S.speed)*3.6).toFixed(1);
+    elRpm.textContent = Math.round(S.rpm);
+    elGear.textContent = S.gear;
+
+    renderer.render(scene,camera);
+  }
+
+  function loop(){
+    const dt = Math.min(0.1, clock.getDelta());
+    acc += dt;
+    while(acc >= FIXED_DT){ physicsStep(FIXED_DT); acc -= FIXED_DT; }
+    checkApplePickup();
+    renderFrame();
+    requestAnimationFrame(loop);
+  }
+
+  (function boot(){
+    // สร้างถนน/ภูเขา
+    // (เรียกไปแล้วด้านบน)
+    addEventListener('resize', ()=>{renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();});
+    loop();
+  })();
+  </script>
+</body>
+</html>
