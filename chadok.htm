@@ -1,258 +1,249 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ชาดก 500 ชาติ</title>
-
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
-
-  <style>
-    body { font-family: 'Prompt', sans-serif; }
-    .modal-animate { animation: fadeIn 0.2s ease-out; }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-  </style>
-</head>
-
-<body class="bg-gray-900 min-h-screen text-gray-100">
-  <div class="max-w-7xl mx-auto p-3">
-
-    <!-- ส่วนหัวข้อใหญ่ -->
-    <div class="text-center py-6 mb-4">
-      <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-300 to-yellow-500 drop-shadow-sm mb-2">
-        ชาดก 500 ชาติ
-      </h1>
-      <p class="text-gray-400 text-sm sm:text-base">รวมเรื่องราวนิทานชาดกสอนใจ</p>
-      <div class="h-1 w-24 bg-yellow-500 mx-auto mt-4 rounded-full opacity-70"></div>
-    </div>
-
-    <!-- Header & Search Bar -->
-    <div class="flex flex-col sm:flex-row justify-between items-center mb-6 px-1 gap-4">
-      <h2 class="text-xl font-bold text-white self-start sm:self-center">รายการแนะนำ</h2>
-
-      <!-- Search Input -->
-      <div class="relative w-full sm:w-72 group">
-        <input
-          type="text"
-          id="searchInput"
-          oninput="renderStories(this.value)"
-          placeholder="ค้นหาชื่อเรื่อง..."
-          class="w-full bg-gray-800 text-gray-200 border border-gray-700 rounded-full py-2 pl-4 pr-10 focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-all text-sm placeholder-gray-500 shadow-sm group-hover:border-gray-600"
-        />
-        <button class="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-yellow-400 transition-colors" aria-label="ค้นหา">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- Grid Container -->
-    <div id="storyGrid" class="grid grid-cols-3 gap-3 sm:gap-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 justify-items-center">
-      <!-- Cards injected by JS -->
-    </div>
-
-    <!-- ถ้าไม่พบข้อมูล -->
-    <div id="noResult" class="hidden text-center text-gray-500 mt-10 w-full col-span-full">
-      <p>ไม่พบรายการที่ค้นหา</p>
-    </div>
-  </div>
-
-  <!-- Modal -->
-  <div id="selectionModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="closeModalOnOutside(event)">
-    <div class="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl modal-animate relative overflow-hidden flex flex-col">
-
-      <div class="h-32 w-full relative">
-        <img id="modalImage" src="" alt="Modal Cover" class="w-full h-full object-cover opacity-60">
-        <div class="absolute inset-0 bg-gradient-to-t from-gray-800 to-transparent"></div>
-        <button onclick="closeModal()" class="absolute top-2 right-2 p-1 bg-black/40 rounded-full text-gray-200 hover:text-white hover:bg-black/60 transition-all" aria-label="ปิด">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="p-6 -mt-6 relative z-10">
-        <div class="text-center mb-6">
-          <h2 id="modalTitle" class="text-xl font-bold text-white mb-2 drop-shadow-md">ชื่อเรื่อง</h2>
-          <p class="text-gray-400 text-xs">เลือกโหมดการอ่านที่คุณต้องการ</p>
-        </div>
-
-        <div class="space-y-3">
-          <a id="btnSynopsis" href="#" target="_blank" class="block w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-center transition-all duration-200 border border-gray-600 hover:border-yellow-400 group">
-            <div class="flex items-center justify-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span class="text-sm font-medium">ฉบับการ์ตูนสั้น</span>
-            </div>
-          </a>
-
-          <a id="btnFullStory" href="#" target="_blank" class="block w-full py-3 px-4 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white rounded-xl text-center shadow-lg hover:shadow-yellow-500/30 transition-all duration-200 transform hover:-translate-y-0.5">
-            <div class="flex items-center justify-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              <span class="text-sm font-semibold">เนื้อเรื่องเต็ม</span>
-            </div>
-          </a>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <script>
-    // =========================
-    // ✅ ตัดส่วน JSON ออกตามที่ขอ
-    // =========================
-    // ใส่ข้อมูลทีหลังได้ 2 วิธี:
-    // 1) วาง array ข้อมูลลงใน stories (เดิม)
-    // 2) หรือแยกไปไฟล์ stories.js แล้วโหลด <script src="stories.js"></script> ก่อนสคริปต์นี้
-    const stories = []; // <-- ตอนนี้เป็นค่าว่าง (ไม่มี JSON)
-
-    // Elements
-    const storyGrid = document.getElementById("storyGrid");
-    const noResult = document.getElementById("noResult");
-
-    const selectionModal = document.getElementById("selectionModal");
-    const modalTitle = document.getElementById("modalTitle");
-    const modalImage = document.getElementById("modalImage");
-    const btnSynopsis = document.getElementById("btnSynopsis");
-    const btnFullStory = document.getElementById("btnFullStory");
-
-    // Utils
-    function safeText(v) {
-      return (v ?? "").toString();
-    }
-
-    function normalizeText(s) {
-      return safeText(s).trim().toLowerCase();
-    }
-
-    function truncate(text, maxLen = 18) {
-      const t = safeText(text);
-      return t.length > maxLen ? t.slice(0, maxLen - 1) + "…" : t;
-    }
-
-    function getFallbackCover(title) {
-      // สร้างรูป placeholder แบบ gradient (ไม่พึ่งรูปภายนอก)
-      const svg = encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="600" height="400">
-          <defs>
-            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#f59e0b"/>
-              <stop offset="1" stop-color="#fb7185"/>
-            </linearGradient>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#g)"/>
-          <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle"
-            font-size="34" font-family="Prompt, sans-serif" fill="white" opacity="0.95">
-            ${safeText(title).replace(/</g,"&lt;").replace(/>/g,"&gt;")}
-          </text>
-        </svg>
-      `);
-      return `data:image/svg+xml;charset=utf-8,${svg}`;
-    }
-
-    // Render cards
-    function renderStories(keyword = "") {
-      const q = normalizeText(keyword);
-      const filtered = stories.filter(s => normalizeText(s.title).includes(q));
-
-      storyGrid.innerHTML = "";
-
-      if (!filtered.length) {
-        noResult.classList.toggle("hidden", stories.length !== 0); // ถ้ามี data แล้วค้นไม่เจอค่อยโชว์
-        if (stories.length === 0) {
-          // ถ้าไม่มี data เลย ให้โชว์ข้อความแบบสุภาพ
-          noResult.classList.remove("hidden");
-          noResult.innerHTML = `<p class="text-gray-500">ยังไม่มีข้อมูลใน <code class="text-gray-300">stories</code> (คุณตัด JSON ออกแล้ว) — วางข้อมูลแล้วรีเฟรชได้เลย</p>`;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ชาดก 500 ชาติ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        .modal-animate { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
-        return;
-      }
+        /* ซ่อน Scrollbar ของแถบหมวดหมู่แต่ยังเลื่อนได้ */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-gray-100">
 
-      noResult.classList.add("hidden");
+    <div class="max-w-7xl mx-auto p-3">
 
-      filtered.forEach(story => {
-        const cover = story.image ? story.image : getFallbackCover(story.title);
-
-        const card = document.createElement("button");
-        card.type = "button";
-        card.className = "w-full max-w-[140px] sm:max-w-[160px] text-left group";
-        card.onclick = () => openModal(story);
-
-        card.innerHTML = `
-          <div class="rounded-2xl overflow-hidden bg-gray-800 border border-gray-700 shadow hover:shadow-yellow-500/10 transition-all duration-200">
-            <div class="aspect-[3/4] w-full overflow-hidden">
-              <img src="${cover}"
-                   alt="${safeText(story.title)}"
-                   class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                   onerror="this.src='${getFallbackCover(story.title)}'">
+        <div class="text-center py-6 mb-4">
+            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-300 to-yellow-500 drop-shadow-sm mb-2">
+                ชาดก 500 ชาติ
+            </h1>
+            <p class="text-gray-400 text-sm sm:text-base">รวมเรื่องราวนิทานชาดกสอนใจ</p>
+            <div class="h-1 w-24 bg-yellow-500 mx-auto mt-4 rounded-full opacity-70"></div>
+        </div>
+        
+        <div class="flex flex-col gap-4 mb-6">
+            
+            <div class="flex justify-between items-center px-1">
+                <h2 class="text-xl font-bold text-white hidden sm:block">เลือกรายการ</h2>
+                <div class="relative w-full sm:w-72 group">
+                    <input type="text" 
+                           id="searchInput"
+                           oninput="handleSearch(this.value)"
+                           placeholder="ค้นหาชื่อเรื่อง..." 
+                           class="w-full bg-gray-800 text-gray-200 border border-gray-700 rounded-full py-2 pl-4 pr-10 focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-all text-sm placeholder-gray-500 shadow-sm group-hover:border-gray-600">
+                    <button class="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-yellow-400 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <div class="p-2.5">
-              <div class="text-[13px] font-semibold text-gray-100 leading-snug">
-                ${truncate(story.title, 22)}
-              </div>
-              <div class="text-[11px] text-gray-400 mt-1">
-                ${safeText(story.category || "ชาดก")}
-              </div>
+
+            <div class="w-full overflow-x-auto hide-scrollbar pb-2">
+                <div id="categoryTabs" class="flex gap-2 min-w-max px-1">
+                    </div>
             </div>
-          </div>
-        `;
+        </div>
+        
+        <div id="storyGrid" class="grid grid-cols-3 gap-3 sm:gap-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 justify-items-center">
+            </div>
 
-        storyGrid.appendChild(card);
-      });
-    }
+        <div id="noResult" class="hidden text-center text-gray-500 mt-10 w-full col-span-full">
+            <p>ไม่พบรายการที่ค้นหา</p>
+        </div>
+    </div>
 
-    // Modal handlers
-    function openModal(story) {
-      const cover = story.image ? story.image : getFallbackCover(story.title);
+    <div id="selectionModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="closeModalOnOutside(event)">
+        <div class="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl modal-animate relative overflow-hidden flex flex-col">
+            <div class="h-32 w-full relative">
+                <img id="modalImage" src="" alt="Modal Cover" class="w-full h-full object-cover opacity-60">
+                <div class="absolute inset-0 bg-gradient-to-t from-gray-800 to-transparent"></div>
+                <button onclick="closeModal()" class="absolute top-2 right-2 p-1 bg-black/40 rounded-full text-gray-200 hover:text-white hover:bg-black/60 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="p-6 -mt-6 relative z-10">
+                <div class="text-center mb-6">
+                    <h2 id="modalTitle" class="text-xl font-bold text-white mb-2 drop-shadow-md">ชื่อเรื่อง</h2>
+                    <p class="text-gray-400 text-xs">เลือกโหมดการอ่านที่คุณต้องการ</p>
+                </div>
+                <div class="space-y-3">
+                    <a id="btnSynopsis" href="#" target="_blank" class="block w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-center transition-all duration-200 border border-gray-600 hover:border-yellow-400 group">
+                        <div class="flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            <span class="text-sm font-medium">ฉบับการ์ตูนสั้น</span>
+                        </div>
+                    </a>
+                    <a id="btnFullStory" href="#" target="_blank" class="block w-full py-3 px-4 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white rounded-xl text-center shadow-lg hover:shadow-yellow-500/30 transition-all duration-200 transform hover:-translate-y-0.5">
+                        <div class="flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                            <span class="text-sm font-semibold">เนื้อเรื่องเต็ม</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
-      modalTitle.textContent = safeText(story.title || "ชื่อเรื่อง");
-      modalImage.src = cover;
+    <script>
+        // --- 1. ข้อมูล JSON ---
+        const stories = [
+          // *** วางข้อมูล stories เดิมของคุณทั้งหมด 547 เรื่องที่นี่ ***
+          // ตัวอย่าง:
+          { "id": 1, "title": "อปัณณกชาดก", "category": "ชาดก", "image": "https://lh3.googleusercontent.com/d/18eK2Nx1PYsSuQ5vAOiThCC8vQs9Il03j", "synopsisUrl": "#", "fullStoryUrl": "#" },
+          { "id": 2, "title": "วัณณุปถชาดก", "category": "ชาดก", "image": "https://lh3.googleusercontent.com/d/1RtR7tRns-PAceXSsfCj-XSnMG6eYsK5F", "synopsisUrl": "#", "fullStoryUrl": "#" },
+          // ... (จนถึง 547)
+           {
+            "id": 547,
+            "title": "มหาเวสสันตรชาดก",
+            "category": "ชาดก",
+            "image": "https://lh3.googleusercontent.com/d/16I6GPyDWIHzSuggwqumbM8dACkR3HUR9",
+            "synopsisUrl": "#",
+            "fullStoryUrl": "https://raw.githack.com/tontakankeawpang321-glitch/hostingnew.github.io/main/chadok/547%20%E0%B8%8A%E0%B8%B2%E0%B8%94%E0%B8%81%20500%20%E0%B8%8A%E0%B8%B2%E0%B8%95%E0%B8%B4.htm"
+          }
+        ];
 
-      // ปุ่มลิงก์ (ถ้าไม่มีให้ปิดปุ่ม/เปลี่ยนเป็น #)
-      const syn = safeText(story.synopsisUrl || "#");
-      const full = safeText(story.fullStoryUrl || "#");
+        // --- Configuration ---
+        const ITEMS_PER_GROUP = 50; // จำนวนเรื่องต่อหมวด
+        let activeGroupIndex = 0; // หมวดที่เลือกอยู่ (0 = กลุ่มแรก)
 
-      btnSynopsis.href = syn;
-      btnFullStory.href = full;
+        // --- 2. สร้างปุ่มหมวดหมู่ (Tabs) ---
+        function renderCategoryTabs() {
+            const container = document.getElementById('categoryTabs');
+            container.innerHTML = '';
 
-      // ถ้าเป็น # ให้ disable สไตล์นิดนึง
-      btnSynopsis.classList.toggle("opacity-50", syn === "#");
-      btnSynopsis.classList.toggle("pointer-events-none", syn === "#");
+            const totalGroups = Math.ceil(stories.length / ITEMS_PER_GROUP);
 
-      btnFullStory.classList.toggle("opacity-50", full === "#");
-      btnFullStory.classList.toggle("pointer-events-none", full === "#");
+            // ปุ่ม "ทั้งหมด"
+            const allBtn = createTabButton('ทั้งหมด', -1);
+            container.appendChild(allBtn);
 
-      selectionModal.classList.remove("hidden");
-      selectionModal.classList.add("flex");
-      document.body.style.overflow = "hidden";
-    }
+            // ปุ่มตามช่วง (1-50, 51-100, ...)
+            for (let i = 0; i < totalGroups; i++) {
+                const start = (i * ITEMS_PER_GROUP) + 1;
+                const end = Math.min((i + 1) * ITEMS_PER_GROUP, stories.length);
+                const label = `${start}-${end}`;
+                const btn = createTabButton(label, i);
+                container.appendChild(btn);
+            }
+        }
 
-    function closeModal() {
-      selectionModal.classList.add("hidden");
-      selectionModal.classList.remove("flex");
-      document.body.style.overflow = "";
-    }
+        function createTabButton(label, index) {
+            const btn = document.createElement('button');
+            btn.innerText = label;
+            btn.className = `px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap border ${
+                (activeGroupIndex === index) 
+                ? 'bg-yellow-500 text-black border-yellow-500 shadow-md transform scale-105' 
+                : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500 hover:text-white'
+            }`;
+            
+            btn.onclick = () => {
+                activeGroupIndex = index;
+                document.getElementById('searchInput').value = ''; // เคลียร์ช่องค้นหา
+                renderCategoryTabs(); // รีเฟรชสีปุ่ม
+                renderStories(); // รีเฟรชเนื้อหา
+            };
+            return btn;
+        }
 
-    function closeModalOnOutside(event) {
-      // ปิดเมื่อคลิกพื้นหลัง (นอกกล่อง modal)
-      if (event.target === selectionModal) closeModal();
-    }
+        // --- 3. แสดงผลการ์ด (Render Logic) ---
+        function renderStories(searchText = '') {
+            const grid = document.getElementById('storyGrid');
+            const noResult = document.getElementById('noResult');
+            let displayData = [];
 
-    // Initial render
-    renderStories("");
-  </script>
+            // ถ้ามีการค้นหา -> ให้ค้นจากทั้งหมด 547 เรื่อง
+            if (searchText.trim() !== '') {
+                // ปรับ UI ปุ่มกดให้ดูเหมือนไม่ได้เลือกหมวดใดเป็นพิเศษ (Optional)
+                // activeGroupIndex = null; 
+                // renderCategoryTabs(); // ถ้าอยากให้ปุ่มเทาหมดตอนค้นหา ให้เปิดคอมเมนต์นี้
 
- 
+                displayData = stories.filter(story => 
+                    story.title.toLowerCase().includes(searchText.toLowerCase()) || 
+                    story.id.toString().includes(searchText)
+                );
+            } 
+            // ถ้าไม่มีการค้นหา -> ให้แสดงตามหมวดที่เลือก
+            else {
+                if (activeGroupIndex === -1) {
+                    displayData = stories; // แสดงทั้งหมด
+                } else {
+                    const startIdx = activeGroupIndex * ITEMS_PER_GROUP;
+                    const endIdx = startIdx + ITEMS_PER_GROUP;
+                    displayData = stories.slice(startIdx, endIdx);
+                }
+            }
+
+            // แสดงผล
+            if (displayData.length === 0) {
+                grid.innerHTML = '';
+                noResult.classList.remove('hidden');
+                return;
+            } else {
+                noResult.classList.add('hidden');
+            }
+
+            const htmlContent = displayData.map(story => `
+                <div onclick="openModal('${story.image}', '${story.id}. ${story.title}', '${story.synopsisUrl}', '${story.fullStoryUrl}')" 
+                     class="group relative w-full max-w-[128px] bg-gray-800 rounded-lg overflow-hidden shadow-md cursor-pointer border border-gray-700 hover:border-yellow-500 transition-all duration-300 hover:-translate-y-1">
+                    <div class="aspect-[2/3] w-full overflow-hidden relative">
+                        <img src="${story.image}" alt="${story.title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90"></div>
+                    </div>
+                    <div class="absolute bottom-0 left-0 right-0 p-2">
+                        <h3 class="text-xs font-bold text-white leading-tight mb-0.5 line-clamp-2 drop-shadow-md">
+                            ${story.id}. ${story.title}
+                        </h3>
+                        <p class="text-[9px] text-gray-300 line-clamp-1">${story.category}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            grid.innerHTML = htmlContent;
+        }
+
+        // Wrapper สำหรับการพิมพ์ค้นหา
+        function handleSearch(val) {
+            renderStories(val);
+        }
+
+        // --- 4. Modal Functions (เหมือนเดิม) ---
+        function openModal(imageSrc, title, synopsisUrl, fullStoryUrl) {
+            const modal = document.getElementById('selectionModal');
+            document.getElementById('modalImage').src = imageSrc;
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('btnSynopsis').href = synopsisUrl;
+            document.getElementById('btnFullStory').href = fullStoryUrl;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('selectionModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = 'auto';
+        }
+
+        function closeModalOnOutside(event) {
+            if (event.target === document.getElementById('selectionModal')) closeModal();
+        }
+
+        // Initialize
+        renderCategoryTabs();
+        renderStories(); // เริ่มต้นจะแสดง 1-50
+
+    </script>
 </body>
 </html>
