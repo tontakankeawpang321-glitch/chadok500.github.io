@@ -90,12 +90,22 @@
 </head>
 <body>
   <div class="container">
-    <div class="audio-wrapper">
-      <a href="#" class="download-link">↓ ดาวน์โหลดเสียงนี้ [?]</a>
-      <audio controls>
-        <source src="sound.mp3" type="audio/mpeg">
-        เบราว์เซอร์ของคุณไม่รองรับการเล่นไฟล์เสียง
-      </audio>
+     <div class="audio-wrapper">
+      <a
+        class="download-link"
+        href="https://drive.google.com/uc?export=download&id="
+        target="_blank"
+        rel="noopener"
+      >
+        ↓ ดาวน์โหลดเสียงนี้
+      </a>
+
+      <iframe
+        class="drive-audio"
+        src="https://drive.google.com/file/d//preview"
+        allow="autoplay"
+        loading="lazy"
+      ></iframe>
     </div>
 
     <h1>มหาเวสสันตรชาดก: ว่าด้วยพระเวสสันดรทรงบำเพ็ญทานบารมี</h1>
