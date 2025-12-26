@@ -17,6 +17,20 @@
         /* ซ่อน Scrollbar ของแถบหมวดหมู่แต่ยังเลื่อนได้ */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #eab308;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen text-gray-100">
@@ -63,7 +77,8 @@
         </div>
     </div>
 
-    <div id="selectionModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="closeModalOnOutside(event)">
+    <!-- Selection Modal (หน้าต่างเลือกโหมด) -->
+    <div id="selectionModal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="closeModalOnOutside(event)">
         <div class="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl modal-animate relative overflow-hidden flex flex-col">
             <div class="h-32 w-full relative">
                 <img id="modalImage" src="" alt="Modal Cover" class="w-full h-full object-cover opacity-60">
@@ -84,21 +99,55 @@
                             <span class="text-sm font-medium">หนังสือการ์ตูนสั้น</span>
                         </div>
                     </a>
-                    <a id="btnFullStory" href="#" target="_blank" class="block w-full py-3 px-4 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white rounded-xl text-center shadow-lg hover:shadow-yellow-500/30 transition-all duration-200 transform hover:-translate-y-0.5">
+                    
+                    <!-- ปุ่มเปิด Video Modal -->
+                    <button id="btnFullStory" type="button" class="block w-full py-3 px-4 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white rounded-xl text-center shadow-lg hover:shadow-yellow-500/30 transition-all duration-200 transform hover:-translate-y-0.5">
                         <div class="flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                             <span class="text-sm font-semibold">แบบวิดีโอสั้น</span>
                         </div>
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Video Modal (หน้าต่างเล่นวิดีโอ) -->
+    <div id="videoModal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/95 backdrop-blur modal-animate" onclick="closeVideoModalOnOutside(event)">
+        <div class="relative w-full max-w-5xl p-2 sm:p-4">
+            <!-- ปุ่มปิด -->
+            <button onclick="closeVideoModal()" class="absolute -top-10 right-4 sm:-right-2 text-white hover:text-yellow-400 transition-colors flex items-center gap-1">
+                <span class="text-sm font-medium">ปิด</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            
+            <!-- Container วิดีโอ -->
+            <div class="w-full aspect-video bg-black rounded-lg shadow-2xl overflow-hidden border border-gray-800 relative">
+                <div id="videoLoader" class="absolute inset-0 flex items-center justify-center z-0">
+                    <div class="loader"></div>
+                </div>
+                <iframe id="videoFrame" 
+                        class="w-full h-full relative z-10" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                        allowfullscreen
+                        onload="document.getElementById('videoLoader').style.display='none'">
+                </iframe>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // --- 1. ข้อมูล JSON ---
+        // ฟังก์ชันป้องกัน error จากเครื่องหมายคำพูดในชื่อเรื่อง
+        function escapeHtml(text) {
+            if (!text) return text;
+            return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
         const stories = [
-            {
+             {
   "id": 1,
   "title": "อปัณณกชาดก",
   "category": "ชาดก",
@@ -4474,11 +4523,12 @@
   "synopsisUrl": "#",
   "fullStoryUrl": "https://raw.githack.com/tontakankeawpang321-glitch/hostingnew.github.io/main/chadok/547%20%E0%B8%8A%E0%B8%B2%E0%B8%94%E0%B8%81%20500%20%E0%B8%8A%E0%B8%B2%E0%B8%95%E0%B8%B4.htm"
 }
+    
         ];
 
         // --- Configuration ---
-        const ITEMS_PER_GROUP = 50; // จำนวนเรื่องต่อหมวด
-        let activeGroupIndex = 0; // หมวดที่เลือกอยู่ (0 = กลุ่มแรก)
+        const ITEMS_PER_GROUP = 50; 
+        let activeGroupIndex = 0; 
 
         // --- 2. สร้างปุ่มหมวดหมู่ (Tabs) ---
         function renderCategoryTabs() {
@@ -4487,11 +4537,9 @@
 
             const totalGroups = Math.ceil(stories.length / ITEMS_PER_GROUP);
 
-            // ปุ่ม "ทั้งหมด"
             const allBtn = createTabButton('ทั้งหมด', -1);
             container.appendChild(allBtn);
 
-            // ปุ่มตามช่วง (1-50, 51-100, ...)
             for (let i = 0; i < totalGroups; i++) {
                 const start = (i * ITEMS_PER_GROUP) + 1;
                 const end = Math.min((i + 1) * ITEMS_PER_GROUP, stories.length);
@@ -4512,34 +4560,28 @@
             
             btn.onclick = () => {
                 activeGroupIndex = index;
-                document.getElementById('searchInput').value = ''; // เคลียร์ช่องค้นหา
-                renderCategoryTabs(); // รีเฟรชสีปุ่ม
-                renderStories(); // รีเฟรชเนื้อหา
+                document.getElementById('searchInput').value = ''; 
+                renderCategoryTabs(); 
+                renderStories(); 
             };
             return btn;
         }
 
-        // --- 3. แสดงผลการ์ด (Render Logic) ---
+        // --- 3. แสดงผลการ์ด ---
         function renderStories(searchText = '') {
             const grid = document.getElementById('storyGrid');
             const noResult = document.getElementById('noResult');
             let displayData = [];
 
-            // ถ้ามีการค้นหา -> ให้ค้นจากทั้งหมด 547 เรื่อง
             if (searchText.trim() !== '') {
-                // ปรับ UI ปุ่มกดให้ดูเหมือนไม่ได้เลือกหมวดใดเป็นพิเศษ (Optional)
-                // activeGroupIndex = null; 
-                // renderCategoryTabs(); // ถ้าอยากให้ปุ่มเทาหมดตอนค้นหา ให้เปิดคอมเมนต์นี้
-
                 displayData = stories.filter(story => 
                     story.title.toLowerCase().includes(searchText.toLowerCase()) || 
                     story.id.toString().includes(searchText)
                 );
             } 
-            // ถ้าไม่มีการค้นหา -> ให้แสดงตามหมวดที่เลือก
             else {
                 if (activeGroupIndex === -1) {
-                    displayData = stories; // แสดงทั้งหมด
+                    displayData = stories; 
                 } else {
                     const startIdx = activeGroupIndex * ITEMS_PER_GROUP;
                     const endIdx = startIdx + ITEMS_PER_GROUP;
@@ -4547,7 +4589,6 @@
                 }
             }
 
-            // แสดงผล
             if (displayData.length === 0) {
                 grid.innerHTML = '';
                 noResult.classList.remove('hidden');
@@ -4557,7 +4598,7 @@
             }
 
             const htmlContent = displayData.map(story => `
-                <div onclick="openModal('${story.image}', '${story.id}. ${story.title}', '${story.synopsisUrl}', '${story.fullStoryUrl}')" 
+                <div onclick="openModal('${story.image}', '${escapeHtml(story.id + '. ' + story.title)}', '${story.synopsisUrl}', '${story.fullStoryUrl}')" 
                      class="group relative w-full max-w-[128px] bg-gray-800 rounded-lg overflow-hidden shadow-md cursor-pointer border border-gray-700 hover:border-yellow-500 transition-all duration-300 hover:-translate-y-1">
                     <div class="aspect-[2/3] w-full overflow-hidden relative">
                         <img src="${story.image}" alt="${story.title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
@@ -4575,18 +4616,32 @@
             grid.innerHTML = htmlContent;
         }
 
-        // Wrapper สำหรับการพิมพ์ค้นหา
         function handleSearch(val) {
             renderStories(val);
         }
 
-        // --- 4. Modal Functions (เหมือนเดิม) ---
+        // --- 4. Selection Modal Functions ---
         function openModal(imageSrc, title, synopsisUrl, fullStoryUrl) {
             const modal = document.getElementById('selectionModal');
             document.getElementById('modalImage').src = imageSrc;
             document.getElementById('modalTitle').innerText = title;
             document.getElementById('btnSynopsis').href = synopsisUrl;
-            document.getElementById('btnFullStory').href = fullStoryUrl;
+            
+            const btnVideo = document.getElementById('btnFullStory');
+            
+            // เช็คว่ามีลิงก์หรือไม่ ถ้าเป็น # หรือว่างเปล่า ให้ disable ปุ่ม
+            if (!fullStoryUrl || fullStoryUrl === '#' || fullStoryUrl.trim() === '') {
+                btnVideo.classList.add('opacity-50', 'cursor-not-allowed');
+                btnVideo.onclick = function(e) {
+                    e.preventDefault();
+                };
+            } else {
+                btnVideo.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnVideo.onclick = function() {
+                    openVideoModal(fullStoryUrl);
+                };
+            }
+
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             document.body.style.overflow = 'hidden';
@@ -4603,9 +4658,81 @@
             if (event.target === document.getElementById('selectionModal')) closeModal();
         }
 
+        // --- 5. Video Player Modal Functions (Robust Embed Converter) ---
+        
+        function extractVideoID(url) {
+            if (!url) return null;
+            
+            // ลบช่องว่างหน้าหลังที่อาจติดมา
+            url = url.trim();
+
+            // 1. ลองแยกด้วย URL Object (วิธีมาตรฐาน)
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.hostname.includes('youtube.com')) {
+                    if (urlObj.searchParams.has('v')) return urlObj.searchParams.get('v'); // แบบ watch?v=ID
+                    if (urlObj.pathname.startsWith('/embed/')) return urlObj.pathname.split('/')[2];
+                    if (urlObj.pathname.startsWith('/shorts/')) return urlObj.pathname.split('/')[2];
+                    if (urlObj.pathname.startsWith('/v/')) return urlObj.pathname.split('/')[2];
+                }
+                if (urlObj.hostname === 'youtu.be') {
+                    return urlObj.pathname.slice(1); // แบบ youtu.be/ID
+                }
+            } catch (e) {
+                // ถ้า URL format ไม่ถูกต้อง ให้ลองใช้ Regex ด้านล่าง
+            }
+
+            // 2. ใช้ Regex (กรณี URL ไม่สมบูรณ์หรือแปลกๆ)
+            // รองรับทั้ง youtu.be, youtube.com/watch, embed, shorts
+            const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+            return match ? match[1] : null;
+        }
+
+        function openVideoModal(url) {
+            closeModal();
+
+            const videoModal = document.getElementById('videoModal');
+            const videoFrame = document.getElementById('videoFrame');
+            const videoLoader = document.getElementById('videoLoader');
+            
+            videoLoader.style.display = 'flex';
+
+            const videoId = extractVideoID(url);
+            let embedUrl = url; // ถ้าไม่ใช่ YouTube ก็ใช้ลิงก์เดิม
+
+            if (videoId) {
+                // สร้าง Embed URL ใหม่จาก ID ที่ดึงมาได้
+                // ใส่พารามิเตอร์ autoplay, playsinline (เล่นบนมือถือไม่เด้ง), rel=0
+                embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+            }
+
+            videoFrame.src = embedUrl;
+            videoModal.classList.remove('hidden');
+            videoModal.classList.add('flex');
+            document.body.style.overflow = 'hidden'; 
+        }
+
+        function closeVideoModal() {
+            const videoModal = document.getElementById('videoModal');
+            const videoFrame = document.getElementById('videoFrame');
+            
+            // รีเซ็ต src เป็นค่าว่างเพื่อหยุดวิดีโอทันที
+            videoFrame.src = ''; 
+            
+            videoModal.classList.add('hidden');
+            videoModal.classList.remove('flex');
+            document.body.style.overflow = 'auto'; 
+        }
+
+        function closeVideoModalOnOutside(event) {
+            if (event.target === document.getElementById('videoModal')) {
+                closeVideoModal();
+            }
+        }
+
         // Initialize
         renderCategoryTabs();
-        renderStories(); // เริ่มต้นจะแสดง 1-50
+        renderStories(); 
 
     </script>
 </body>
