@@ -114,24 +114,29 @@
 
     <!-- Video Modal (หน้าต่างเล่นวิดีโอ) -->
     <div id="videoModal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/95 backdrop-blur modal-animate" onclick="closeVideoModalOnOutside(event)">
-        <div class="relative w-full max-w-5xl p-2 sm:p-4">
+        <!-- ปรับขนาด max-width ให้แคบลง (max-w-sm) เพื่อให้เหมาะกับแนวตั้ง -->
+        <div class="relative w-full max-w-sm p-2 sm:p-4 flex flex-col items-center">
+            
             <!-- ปุ่มปิด -->
-            <button onclick="closeVideoModal()" class="absolute -top-10 right-4 sm:-right-2 text-white hover:text-yellow-400 transition-colors flex items-center gap-1">
+            <button onclick="closeVideoModal()" class="absolute -top-10 right-0 sm:-right-2 text-white hover:text-yellow-400 transition-colors flex items-center gap-1 z-50 bg-black/50 rounded-full px-3 py-1">
                 <span class="text-sm font-medium">ปิด</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
             
-            <!-- Container วิดีโอ -->
-            <div class="w-full aspect-video bg-black rounded-lg shadow-2xl overflow-hidden border border-gray-800 relative">
+            <!-- Container วิดีโอ: ปรับเป็น aspect-[9/16] สำหรับแนวตั้ง -->
+            <div class="w-full aspect-[9/16] bg-black rounded-lg shadow-2xl overflow-hidden border border-gray-800 relative">
                 <div id="videoLoader" class="absolute inset-0 flex items-center justify-center z-0">
                     <div class="loader"></div>
                 </div>
+                <!-- Iframe Youtube -->
                 <iframe id="videoFrame" 
                         class="w-full h-full relative z-10" 
+                        title="YouTube video player"
                         frameborder="0" 
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                        referrerpolicy="strict-origin-when-cross-origin"
                         allowfullscreen
                         onload="document.getElementById('videoLoader').style.display='none'">
                 </iframe>
