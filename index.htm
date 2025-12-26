@@ -4526,7 +4526,7 @@
     
         ];
 
-        // --- Configuration ---
+      // --- Configuration ---
         const ITEMS_PER_GROUP = 50; 
         let activeGroupIndex = 0; 
 
@@ -4629,15 +4629,14 @@
             
             const btnVideo = document.getElementById('btnFullStory');
             
-            // เช็คว่ามีลิงก์หรือไม่ ถ้าเป็น # หรือว่างเปล่า ให้ disable ปุ่ม
+            // เช็คว่ามี URL วิดีโอหรือไม่
             if (!fullStoryUrl || fullStoryUrl === '#' || fullStoryUrl.trim() === '') {
                 btnVideo.classList.add('opacity-50', 'cursor-not-allowed');
-                btnVideo.onclick = function(e) {
-                    e.preventDefault();
-                };
+                btnVideo.onclick = (e) => e.preventDefault();
             } else {
                 btnVideo.classList.remove('opacity-50', 'cursor-not-allowed');
-                btnVideo.onclick = function() {
+                // กำหนด onclick ให้เปิด video modal ด้วย URL ที่ถูกต้อง
+                btnVideo.onclick = () => {
                     openVideoModal(fullStoryUrl);
                 };
             }
@@ -4658,55 +4657,43 @@
             if (event.target === document.getElementById('selectionModal')) closeModal();
         }
 
-        // --- 5. Video Player Modal Functions (Robust Embed Converter) ---
+        // --- 5. Video Player Modal Functions (REVAMPED) ---
         
-        function extractVideoID(url) {
-            if (!url) return null;
-            
-            // ลบช่องว่างหน้าหลังที่อาจติดมา
-            url = url.trim();
-
-            // 1. ลองแยกด้วย URL Object (วิธีมาตรฐาน)
-            try {
-                const urlObj = new URL(url);
-                if (urlObj.hostname.includes('youtube.com')) {
-                    if (urlObj.searchParams.has('v')) return urlObj.searchParams.get('v'); // แบบ watch?v=ID
-                    if (urlObj.pathname.startsWith('/embed/')) return urlObj.pathname.split('/')[2];
-                    if (urlObj.pathname.startsWith('/shorts/')) return urlObj.pathname.split('/')[2];
-                    if (urlObj.pathname.startsWith('/v/')) return urlObj.pathname.split('/')[2];
-                }
-                if (urlObj.hostname === 'youtu.be') {
-                    return urlObj.pathname.slice(1); // แบบ youtu.be/ID
-                }
-            } catch (e) {
-                // ถ้า URL format ไม่ถูกต้อง ให้ลองใช้ Regex ด้านล่าง
-            }
-
-            // 2. ใช้ Regex (กรณี URL ไม่สมบูรณ์หรือแปลกๆ)
-            // รองรับทั้ง youtu.be, youtube.com/watch, embed, shorts
-            const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
-            return match ? match[1] : null;
+        function getYoutubeId(url) {
+            // Regex ครอบคลุมทั้ง youtu.be, youtube.com/watch, embed, v, และ shorts
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
         }
 
         function openVideoModal(url) {
-            closeModal();
+            // 1. ปิด modal เลือกรายการก่อน
+            closeModal(); 
 
+            // 2. เตรียม Video Modal
             const videoModal = document.getElementById('videoModal');
             const videoFrame = document.getElementById('videoFrame');
             const videoLoader = document.getElementById('videoLoader');
             
-            videoLoader.style.display = 'flex';
-
-            const videoId = extractVideoID(url);
-            let embedUrl = url; // ถ้าไม่ใช่ YouTube ก็ใช้ลิงก์เดิม
+            videoLoader.style.display = 'flex'; // แสดง loader
+            
+            // 3. แปลง URL เป็น Embed Format (มาตรฐานเหมือน iframe ตัวอย่าง)
+            const videoId = getYoutubeId(url);
+            let embedUrl = "";
 
             if (videoId) {
-                // สร้าง Embed URL ใหม่จาก ID ที่ดึงมาได้
-                // ใส่พารามิเตอร์ autoplay, playsinline (เล่นบนมือถือไม่เด้ง), rel=0
-                embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+                // สร้าง URL แบบ Embed (ไม่ใส่ autoplay=1 เพื่อให้ user กดเล่นเอง)
+                // rel=0 : ไม่แสดงวิดีโอแนะนำจากช่องอื่นตอนจบ
+                embedUrl = `https://www.youtube.com/embed/${videoId}?rel=0`;
+            } else {
+                // กรณีไม่ใช่ Youtube หรือหา ID ไม่เจอ (เผื่อไว้)
+                embedUrl = url;
             }
 
+            // 4. ใส่ URL เข้า iframe
             videoFrame.src = embedUrl;
+            
+            // 5. แสดงผล
             videoModal.classList.remove('hidden');
             videoModal.classList.add('flex');
             document.body.style.overflow = 'hidden'; 
@@ -4716,7 +4703,7 @@
             const videoModal = document.getElementById('videoModal');
             const videoFrame = document.getElementById('videoFrame');
             
-            // รีเซ็ต src เป็นค่าว่างเพื่อหยุดวิดีโอทันที
+            // ล้าง src เพื่อหยุดเสียง/วิดีโอทันที
             videoFrame.src = ''; 
             
             videoModal.classList.add('hidden');
