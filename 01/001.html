@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ตำนานผู้กล้า - หนังสือนิทานดิจิทัล</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600&display=swap');
+
+        :root {
+            --bg-color: #2a1f15;
+            --text-color: #f0e6d2; /* สีครีมอ่อนๆ อ่านง่ายบนพื้นเข้ม */
+            --accent-color: #d4af37; /* สีทอง */
+            --book-ratio: 4/3;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg-color);
+            font-family: 'Sarabun', serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-color);
+            /* ป้องกันการเด้งของหน้าจอใน iOS */
+            overscroll-behavior: none;
+        }
+
+        #main-container {
+            position: relative;
+            width: 100%;
+            max-width: 1024px;
+            /* Default Landscape Ratio */
+            aspect-ratio: var(--book-ratio);
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        /* กรอบหนังสือ */
+        .book-frame {
+            position: relative;
+            width: 95%;
+            height: 100%;
+            background: #1a120b;
+            border: 5px solid #5a3e2b;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* รางเลื่อนภาพ */
+        #pages-track {
+            display: flex;
+            height: 100%;
+            width: 100%;
+            /* transition จะถูกจัดการโดย JS เพื่อความลื่นไหลตอนลาก */
+            will-change: transform;
+        }
+
+        /* คอนเทนเนอร์ของแต่ละหน้า */
+        .page-container {
+            width: 100%;
+            height: 100%;
+            flex-shrink: 0;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        .book-page-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            -webkit-user-drag: none;
+            user-select: none;
+            filter: brightness(0.9);
+            transition: all 0.5s ease;
+        }
+
+        /* กล่องข้อความเนื้อเรื่อง */
+        .story-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px 40px 40px 40px;
+            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 60%, transparent 100%);
+            color: var(--text-color);
+            text-align: center;
+            box-sizing: border-box;
+            pointer-events: none;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            min-height: 30%;
+        }
+
+        .story-text {
+            font-family: 'Sarabun', sans-serif; /* เปลี่ยนเป็น Sarabun */
+            font-size: 16px; /* ปรับขนาดเป็น 16px */
+            line-height: 1.6;
+            text-shadow: 2px 2px 4px #000;
+            margin: 0;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease 0.3s, transform 0.5s ease 0.3s;
+        }
+
+        .page-container.active .story-text {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ปุ่มควบคุม */
+        .nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(42, 31, 21, 0.8);
+            color: var(--accent-color);
+            border: 2px solid var(--accent-color);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 20;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(5px);
+            /* ป้องกันการแตะซ้ำเร็วๆ บนมือถือ */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .nav-btn:hover {
+            background: var(--accent-color);
+            color: #2a1f15;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .nav-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .nav-btn.disabled {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #prev-btn { left: 20px; }
+        #next-btn { right: 20px; }
+
+        .page-indicator-container {
+            margin-top: 15px;
+            background: rgba(42, 31, 21, 0.8);
+            padding: 8px 25px;
+            border-radius: 20px;
+            border: 1px solid var(--accent-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 30;
+        }
+        #page-indicator {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            letter-spacing: 1px;
+        }
+
+        /* --- RESPONSIVE: PORTRAIT MODE (แนวตั้ง) --- */
+        @media screen and (orientation: portrait) {
+            body {
+                align-items: flex-start; /* เริ่มจากด้านบน */
+            }
+
+            #main-container {
+                width: 100%;
+                height: 100%;
+                max-width: none;
+                max-height: none;
+                aspect-ratio: unset; /* ยกเลิกอัตราส่วนคงที่ */
+            }
+
+            .book-frame {
+                width: 100%;
+                height: 100%;
+                border: none;
+                border-radius: 0;
+                display: flex;
+                flex-direction: column;
+            }
+
+            #pages-track {
+                height: 100%; 
+            }
+
+            /* ปรับ Layout หน้าใหม่ในแนวตั้ง */
+            .page-container {
+                flex-direction: column; /* เรียงบนลงล่าง */
+                background: #15100a;
+            }
+
+            .book-page-img {
+                width: 100%;
+                height: 60%; /* รูปภาพอยู่ด้านบน 60% */
+                object-fit: contain; /* โชว์เต็มรูปไม่ตัดขอบ */
+                background: #000;
+                border-bottom: 2px solid var(--accent-color);
+            }
+
+            .story-caption {
+                position: relative; /* ไม่ซ้อนทับแล้ว */
+                width: 100%;
+                height: 40%; /* ข้อความอยู่ด้านล่าง 40% */
+                background: #1a120b; /* พื้นหลังทึบ */
+                padding: 30px 20px;
+                display: flex;
+                align-items: center; /* จัดกลางแนวตั้ง */
+                justify-content: center;
+                overflow-y: auto; /* เผื่อข้อความยาว */
+            }
+
+            .story-text {
+                font-size: 16px; /* ยืนยันขนาด 16px ในมือถือด้วย */
+                opacity: 1; /* แสดงตลอดเวลา */
+                transform: translateY(0);
+            }
+
+            /* ปรับตำแหน่งปุ่มในแนวตั้ง */
+            .nav-btn {
+                top: auto;
+                bottom: 25px; /* ย้ายมาด้านล่าง */
+                width: 50px;
+                height: 50px;
+                font-size: 24px;
+                background: rgba(42, 31, 21, 0.9);
+            }
+
+            #prev-btn { left: 20px; bottom: 25px; }
+            #next-btn { right: 20px; bottom: 25px; }
+
+            .page-indicator-container {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                margin: 0;
+                background: rgba(0,0,0,0.6);
+                border: none;
+            }
+            
+            #page-indicator {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-container">
+        <div class="book-frame" id="book-viewport">
+            <div id="pages-track">
+                <!-- หน้าหนังสือจะถูกสร้างที่นี่โดย JavaScript -->
+            </div>
+
+            <!-- ปุ่มนำทาง -->
+            <button id="prev-btn" class="nav-btn" aria-label="หน้าก่อนหน้า">&#10094;</button>
+            <button id="next-btn" class="nav-btn" aria-label="หน้าถัดไป">&#10095;</button>
+        
+            <!-- ย้าย Indicator เข้ามาใน Frame สำหรับ Mobile Layout -->
+            <div class="page-indicator-container">
+                <span id="page-indicator">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ข้อมูลหน้าหนังสือ (รูปภาพ + เนื้อเรื่อง)
+        const storyData = [
+            {
+                img: 'unnamed (9).jpg',
+                text: "กาลครั้งหนึ่งนานมาแล้ว ในดินแดนที่ปกคลุมด้วยหมอกแห่งกาลเวลา... ตำนานบทใหม่กำลังจะเริ่มต้นขึ้น"
+            },
+            {
+                img: 'unnamed (10).jpg',
+                text: "เหล่ามังกรผู้พิทักษ์ได้ตื่นขึ้นจากการหลับใหลนับพันปี เพื่อปกป้องขุมทรัพย์แห่งปัญญา"
+            },
+            {
+                img: 'unnamed (11).jpg',
+                text: "อัศวินผู้กล้าจากแดนไกล ได้ยินเสียงเพรียกหาแห่งโชคชะตา จึงออกเดินทางข้ามหุบเขาอันตราย"
+            },
+            {
+                img: 'unnamed (12).jpg',
+                text: "เส้นทางที่เต็มไปด้วยขวากหนาม และบททดสอบแห่งจิตใจที่รอคอยผู้มาเยือน"
+            },
+            {
+                img: 'unnamed (13).jpg',
+                text: "ณ ปราสาทโบราณที่ถูกลืมเลือน ความลับแห่งบรรพกาลยังคงซ่อนตัวอยู่ในเงามืด"
+            },
+            {
+                img: 'unnamed (14).jpg',
+                text: "แสงสว่างแห่งความหวังเริ่มส่องประกาย เมื่อผู้ที่มีหัวใจบริสุทธิ์ก้าวเข้ามา"
+            },
+            {
+                img: 'unnamed (15).jpg',
+                text: "การเผชิญหน้าครั้งสำคัญ ระหว่างความมืดและแสงสว่าง กำลังจะอุบัติขึ้น"
+            },
+            {
+                img: 'unnamed (16).jpg',
+                text: "ไม่ใช่ด้วยคมดาบ... แต่ด้วยศรัทธาและความกล้าหาญที่จะเปลี่ยนแปลงโลกใบนี้"
+            },
+            {
+                img: 'unnamed (17).jpg',
+                text: "เมื่อพันธสัญญาเก่าแก่ถูกรื้อฟื้น ท้องฟ้าที่มืดมิดก็กลับมาสดใสอีกครั้ง"
+            },
+            {
+                img: 'unnamed (18).jpg',
+                text: "และแล้วตำนานแห่งผู้กล้า ก็ได้ถูกจารึกไว้ในประวัติศาสตร์สืบไป... ตลอดกาล"
+            }
+        ];
+
+        let currentIndex = 0;
+        const totalPages = storyData.length;
+
+        const track = document.getElementById('pages-track');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const indicator = document.getElementById('page-indicator');
+        const viewport = document.getElementById('book-viewport');
+
+        // เริ่มต้น: สร้างหน้าหนังสือ
+        function initBook() {
+            storyData.forEach((page, index) => {
+                // สร้าง Container ของหน้า
+                const pageDiv = document.createElement('div');
+                pageDiv.classList.add('page-container');
+                if (index === 0) pageDiv.classList.add('active'); // หน้าแรก active
+
+                // สร้างรูปภาพ
+                const img = document.createElement('img');
+                img.src = page.img;
+                img.alt = `หน้าหนังสือที่ ${index + 1}`;
+                img.classList.add('book-page-img');
+                img.ondragstart = () => false;
+
+                // สร้างส่วนข้อความ (Caption)
+                const captionDiv = document.createElement('div');
+                captionDiv.classList.add('story-caption');
+                
+                const textP = document.createElement('p');
+                textP.classList.add('story-text');
+                textP.textContent = page.text;
+
+                // ประกอบร่าง
+                // สำหรับ Mobile Portrait เราจะใช้ Flex column สลับที่ได้ง่าย แต่ใน HTML วางแบบเดิม CSS จัดการเอา
+                pageDiv.appendChild(img);
+                pageDiv.appendChild(captionDiv);
+                
+                track.appendChild(pageDiv);
+            });
+            updateView();
+        }
+
+        // อัปเดตการแสดงผล
+        function updateView() {
+            // ตั้งค่า transition ให้ทำงานเสมอเมื่อมีการเปลี่ยนหน้าโดยปุ่มหรือจบการลาก
+            track.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+            
+            const translateX = -(currentIndex * 100);
+            track.style.transform = `translateX(${translateX}%)`;
+
+            // อัปเดตเลขหน้า
+            indicator.textContent = `บทที่ ${currentIndex + 1} / ${totalPages}`;
+
+            // จัดการคลาส active เพื่อเล่น Animation ข้อความ
+            const pages = document.querySelectorAll('.page-container');
+            pages.forEach((p, idx) => {
+                if (idx === currentIndex) {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
+                }
+            });
+
+            // อัปเดตสถานะปุ่ม
+            prevBtn.classList.toggle('disabled', currentIndex === 0);
+            nextBtn.classList.toggle('disabled', currentIndex === totalPages - 1);
+        }
+
+        // ฟังก์ชันเปลี่ยนหน้า
+        function goToPage(index) {
+            if (index < 0) index = 0;
+            if (index >= totalPages) index = totalPages - 1;
+            currentIndex = index;
+            updateView();
+        }
+
+        function nextPage() {
+            if (currentIndex < totalPages - 1) {
+                goToPage(currentIndex + 1);
+            }
+        }
+
+        function prevPage() {
+            if (currentIndex > 0) {
+                goToPage(currentIndex - 1);
+            }
+        }
+
+        // Event Listeners ปุ่ม
+        nextBtn.addEventListener('click', nextPage);
+        prevBtn.addEventListener('click', prevPage);
+
+        // --- ระบบสัมผัสแบบลากจริง (Real-time Drag/Slide) ---
+        let isDragging = false;
+        let startX = 0;
+        let currentTranslate = 0;
+        let prevTranslate = 0;
+        let animationID;
+
+        viewport.addEventListener('touchstart', touchStart, { passive: true });
+        viewport.addEventListener('touchend', touchEnd);
+        viewport.addEventListener('touchmove', touchMove, { passive: false });
+
+        function touchStart(e) {
+            isDragging = true;
+            startX = e.touches[0].clientX;
+            // ยกเลิก animation ชั่วคราวเพื่อให้ภาพขยับตามนิ้วได้ทันที
+            track.style.transition = 'none';
+        }
+
+        function touchMove(e) {
+            if (!isDragging) return;
+            
+            const currentX = e.touches[0].clientX;
+            const diffX = currentX - startX;
+            
+            // แปลงระยะทางที่ลาก (pixels) เป็นเปอร์เซ็นต์เทียบกับความกว้างหน้าจอ
+            const viewportWidth = viewport.offsetWidth;
+            const diffPercent = (diffX / viewportWidth) * 100;
+            
+            // คำนวณตำแหน่งปัจจุบัน
+            const currentBaseTranslate = -(currentIndex * 100);
+            const newTranslate = currentBaseTranslate + diffPercent;
+            
+            // เพิ่มแรงต้าน (Resistance) เมื่อลากเกินหน้าแรกหรือหน้าสุดท้าย
+            if (currentIndex === 0 && diffX > 0) {
+                 track.style.transform = `translateX(${currentBaseTranslate + (diffPercent * 0.3)}%)`;
+            } else if (currentIndex === totalPages - 1 && diffX < 0) {
+                 track.style.transform = `translateX(${currentBaseTranslate + (diffPercent * 0.3)}%)`;
+            } else {
+                 track.style.transform = `translateX(${newTranslate}%)`;
+            }
+        }
+
+        function touchEnd(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            const movedBy = e.changedTouches[0].clientX - startX;
+            const threshold = 50; // ต้องลากเกิน 50px ถึงจะเปลี่ยนหน้า
+
+            // ตรวจสอบทิศทางและระยะทาง
+            if (movedBy < -threshold && currentIndex < totalPages - 1) {
+                currentIndex++;
+            } else if (movedBy > threshold && currentIndex > 0) {
+                currentIndex--;
+            }
+
+            // เรียก updateView เพื่อดีดไปยังหน้าปลายทาง (พร้อม animation)
+            updateView();
+        }
+
+        // รองรับคีย์บอร์ด
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextPage();
+            if (e.key === 'ArrowLeft') prevPage();
+        });
+
+        // เริ่มต้นทำงาน
+        initBook();
+
+    </script>
+</body>
+</html>
