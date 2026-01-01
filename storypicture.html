@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Storybook Creator - PNG Export (Custom Frames)</title>
+    <title>Storybook Creator - PNG Export (Draggable Image & Text)</title>
     
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -31,6 +31,7 @@
             overflow: hidden; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             transform-origin: top center;
             user-select: none;
+            cursor: crosshair; /* Indicate image panning */
         }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -50,7 +51,6 @@
         .style-paper { background-color: #fffbf0; border: 2px solid #e5e0d0; border-radius: 4px; padding: 1.5rem; position: relative; }
         .style-comic { background-color: white; border: 4px solid black; border-radius: 4px; padding: 1.5rem; box-shadow: 8px 8px 0px black; }
         
-        /* New Styles */
         .style-cloud { background-color: white; border-radius: 50px; padding: 2rem; position: relative; border: 4px solid #e0e7ff; }
         .style-retro { background-color: #ffedd5; border: 4px double #9a3412; padding: 1.5rem; color: #7c2d12 !important; border-radius: 0; }
         .style-modern-dark { background-color: #1e293b; border-left: 8px solid #6366f1; padding: 1.5rem; color: white !important; border-radius: 4px; }
@@ -62,10 +62,18 @@
             position: absolute;
             cursor: move;
             transition: outline 0.2s, width 0.1s;
-            z-index: 10;
+            z-index: 20;
         }
         .text-wrapper:hover { outline: 2px dashed #4f46e5; }
         .text-wrapper:active { outline: 2px solid #4f46e5; cursor: grabbing; }
+
+        .draggable-img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
 
         /* PNG Export Styling */
         .png-page {
@@ -97,7 +105,7 @@
                 <input type="file" accept="image/*" multiple class="hidden" @change="handleBulkUpload($event)">
             </label>
             <button @click="exportPNG" :disabled="isExporting" class="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
-                <span v-if="!isExporting" class="flex items-center gap-2"><i class="ph ph-image text-lg"></i> ส่งออก PNG</span>
+                <span v-if="!isExporting" class="flex items-center gap-2"><i class="ph ph-image text-lg"></i> ส่งออก PNG (001-100)</span>
                 <span v-else class="flex items-center gap-2"><div class="loader"></div> กำลังสร้าง...</span>
             </button>
         </div>
@@ -123,7 +131,7 @@
                     </div>
                     <div class="aspect-[210/297] bg-white rounded border overflow-hidden relative shadow-sm pointer-events-none">
                         <div class="absolute inset-0" :style="{ backgroundColor: scene.bgColor }"></div>
-                        <img v-if="scene.image" :src="scene.image" class="absolute inset-0 w-full h-full object-cover">
+                        <img v-if="scene.image" :src="scene.image" class="absolute inset-0 w-full h-full object-cover" :style="{ objectPosition: scene.imgX + '% ' + scene.imgY + '%' }">
                         <div v-else class="absolute inset-0 flex items-center justify-center text-gray-200">
                             <i class="ph ph-image text-2xl"></i>
                         </div>
@@ -136,15 +144,16 @@
         </aside>
 
         <!-- Main Editor -->
-        <main class="flex-1 bg-zinc-700 relative flex flex-col min-w-0" @mousemove="onDragMove" @mouseup="onDragEnd" @mouseleave="onDragEnd">
+        <main class="flex-1 bg-zinc-700 relative flex flex-col min-w-0" @mousemove="onGlobalMouseMove" @mouseup="onGlobalMouseUp" @mouseleave="onGlobalMouseUp">
             
             <!-- Toolbar -->
-            <div class="bg-white border-b px-4 py-2 flex flex-wrap gap-x-6 gap-y-2 items-center z-20 shadow-sm text-sm">
+            <div class="bg-white border-b px-4 py-2 flex flex-wrap gap-x-6 gap-y-2 items-center z-30 shadow-sm text-sm">
                 <div class="flex items-center gap-2 border-r pr-4">
-                    <span class="text-gray-400 font-bold uppercase text-[10px]">รูป</span>
-                    <label class="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition font-medium">เปลี่ยน<input type="file" accept="image/*" class="hidden" @change="handleSingleImageReplace($event)"></label>
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">รูปพื้นหลัง</span>
+                    <label class="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition font-medium">เปลี่ยนรูป<input type="file" accept="image/*" class="hidden" @change="handleSingleImageReplace($event)"></label>
+                    <button @click="resetImagePos" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200" title="รีเซ็ตตำแหน่งรูป"><i class="ph ph-arrows-counter-clockwise"></i></button>
                     <select v-model="activeScene.fit" @change="saveToLocal" class="border rounded px-1 py-1.5 bg-gray-50">
-                        <option value="cover">Crop</option>
+                        <option value="cover">Crop (ลากได้)</option>
                         <option value="contain">Fit</option>
                     </select>
                 </div>
@@ -152,35 +161,29 @@
                 <div class="flex items-center gap-2 border-r pr-4">
                     <span class="text-gray-400 font-bold uppercase text-[10px]">รูปแบบกรอบ</span>
                     <select v-model="activeScene.textStyle" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50">
-                        <optgroup label="มาตรฐาน">
-                            <option value="none">ไม่มีกรอบ</option>
-                            <option value="white-card">การ์ดขาว</option>
-                            <option value="black-glass">กระจกดำ</option>
-                            <option value="paper">กระดาษ</option>
-                            <option value="comic">การ์ตูน</option>
-                        </optgroup>
-                        <optgroup label="นิทาน">
-                            <option value="cloud">ก้อนเมฆ</option>
-                            <option value="pastel-blue">พาสเทล</option>
-                            <option value="retro">ย้อนยุค</option>
-                            <option value="classic-gold">หรูหรา</option>
-                            <option value="modern-dark">โมเดิร์นเข้ม</option>
-                            <option value="neon">นีออน</option>
-                        </optgroup>
+                        <option value="none">ไม่มีกรอบ</option>
+                        <option value="white-card">การ์ดขาว</option>
+                        <option value="black-glass">กระจกดำ</option>
+                        <option value="paper">กระดาษ</option>
+                        <option value="comic">การ์ตูน</option>
+                        <option value="cloud">ก้อนเมฆ</option>
+                        <option value="pastel-blue">พาสเทล</option>
+                        <option value="retro">ย้อนยุค</option>
+                        <option value="classic-gold">หรูหรา</option>
+                        <option value="neon">นีออน</option>
                     </select>
                     <div class="flex flex-col">
-                        <span class="text-[9px] text-gray-400">ความกว้างกรอบ</span>
-                        <input type="range" v-model="activeScene.textWidth" min="20" max="95" @input="saveToLocal" class="w-24 accent-indigo-600">
+                        <span class="text-[9px] text-gray-400">กว้างกรอบ</span>
+                        <input type="range" v-model="activeScene.textWidth" min="20" max="95" @input="saveToLocal" class="w-20 accent-indigo-600">
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2 border-r pr-4">
                     <span class="text-gray-400 font-bold uppercase text-[10px]">ข้อความ</span>
-                    <select v-model="activeScene.fontFamily" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50 w-24">
+                    <select v-model="activeScene.fontFamily" @change="saveToLocal" class="border rounded px-1 py-1.5 bg-gray-50 w-24">
                         <option value="font-sarabun">Sarabun</option>
                         <option value="font-mali">Mali</option>
                         <option value="font-prompt">Prompt</option>
-                        <option value="font-anuphan">Anuphan</option>
                     </select>
                     <input type="number" v-model="activeScene.fontSize" @input="saveToLocal" class="w-12 border rounded px-1 py-1.5 bg-gray-50 text-center">
                     <input type="color" v-model="activeScene.textColor" @input="saveToLocal" class="w-8 h-8 rounded-md cursor-pointer border">
@@ -188,36 +191,39 @@
 
                 <div class="flex items-center gap-2">
                     <span class="text-gray-400 font-bold uppercase text-[10px]">ย้ายด่วน</span>
-                    <button @click="snapPosition('top')" title="บน" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-top"></i></button>
-                    <button @click="snapPosition('center')" title="กลาง" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-center-horizontal"></i></button>
-                    <button @click="snapPosition('bottom')" title="ล่าง" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-bottom"></i></button>
-                </div>
-
-                <div class="flex items-center gap-2 ml-auto">
-                    <input type="color" v-model="activeScene.bgColor" @input="saveToLocal" class="w-8 h-8 rounded-md cursor-pointer border">
+                    <button @click="snapPosition('top')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-top"></i></button>
+                    <button @click="snapPosition('center')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-center-horizontal"></i></button>
+                    <button @click="snapPosition('bottom')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-bottom"></i></button>
                 </div>
             </div>
 
-            <!-- Canvas -->
+            <!-- Canvas Area -->
             <div class="flex-1 overflow-auto flex justify-center py-12 px-4 scroll-smooth">
                 <div id="editor-page" class="a4-page shadow-2xl transition-all duration-300"
+                    @mousedown="onPageMouseDown"
                     :style="{ transform: 'scale(' + zoomLevel + ')', backgroundColor: activeScene.bgColor }">
-                    <img v-if="activeScene.image" :src="activeScene.image" class="absolute inset-0 w-full h-full pointer-events-none" :style="{ objectFit: activeScene.fit }">
                     
-                    <!-- Draggable & Resizable Text Wrapper -->
+                    <!-- Background Image (Draggable via Page) -->
+                    <img v-if="activeScene.image" :src="activeScene.image" class="draggable-img" 
+                        :style="{ 
+                            objectFit: activeScene.fit, 
+                            objectPosition: activeScene.imgX + '% ' + activeScene.imgY + '%' 
+                        }">
+                    
+                    <!-- Draggable Text Wrapper -->
                     <div class="text-wrapper" 
-                        @mousedown="onDragStart"
+                        @mousedown.stop="onTextDragStart"
                         :style="{ 
                             left: activeScene.textX + '%', 
                             top: activeScene.textY + '%', 
                             width: activeScene.textWidth + '%',
                             transform: 'translate(-50%, -50%)' 
                         }">
-                        <div class="pointer-events-auto shadow-sm" :class="['style-' + activeScene.textStyle, activeScene.fontFamily]">
+                        <div class="pointer-events-auto" :class="['style-' + activeScene.textStyle, activeScene.fontFamily]">
                             <textarea 
                                 v-model="activeScene.text"
                                 @input="saveToLocal"
-                                placeholder="พิมพ์เนื้อหานิทานที่นี่ (ลากย้ายได้)..."
+                                placeholder="พิมพ์เนื้อหานิทาน..."
                                 class="w-full bg-transparent resize-none focus:outline-none rounded text-center leading-relaxed block overflow-hidden"
                                 :style="{ fontSize: activeScene.fontSize + 'px', color: activeScene.textColor }"
                                 oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
@@ -228,7 +234,7 @@
             </div>
 
             <!-- Zoom -->
-            <div class="absolute bottom-6 right-6 flex gap-2 bg-white/90 backdrop-blur rounded-full shadow-xl p-2 border border-white/20 z-30">
+            <div class="absolute bottom-6 right-6 flex gap-2 bg-white/90 backdrop-blur rounded-full shadow-xl p-2 border border-white/20 z-40">
                 <button @click="zoomOut" class="p-2 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center"><i class="ph ph-minus font-bold"></i></button>
                 <span class="flex items-center text-sm font-bold w-14 justify-center text-indigo-600">{{ Math.round(zoomLevel * 100) }}%</span>
                 <button @click="zoomIn" class="p-2 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center"><i class="ph ph-plus font-bold"></i></button>
@@ -236,10 +242,11 @@
         </main>
     </div>
 
-    <!-- Export Root (Hidden) -->
+    <!-- Export Container -->
     <div id="export-root" style="position: fixed; left: -10000px; top: 0; width: 210mm;">
         <div v-for="scene in scenes" :key="'ex-' + scene.id" class="png-page" :style="{ backgroundColor: scene.bgColor }">
-            <img v-if="scene.image" :src="scene.image" style="width:100%;height:100%;" :style="{ objectFit: scene.fit }">
+            <img v-if="scene.image" :src="scene.image" style="width:100%;height:100%;" 
+                :style="{ objectFit: scene.fit, objectPosition: scene.imgX + '% ' + scene.imgY + '%' }">
             <div style="position: absolute; transform: translate(-50%, -50%);"
                  :style="{ left: scene.textX + '%', top: scene.textY + '%', width: scene.textWidth + '%' }">
                 <div :class="['style-' + scene.textStyle, scene.fontFamily, 'png-text-content']"
@@ -259,7 +266,10 @@
                 zoomLevel: 0.5,
                 isExporting: false,
                 lastSaved: '',
-                isDragging: false,
+                
+                dragMode: null, // 'text' or 'image'
+                dragStartPos: { x: 0, y: 0 },
+                dragStartVal: { x: 0, y: 0 },
 
                 get activeScene() { return this.scenes[this.activeSceneIndex] || {}; },
 
@@ -271,8 +281,8 @@
 
                 updateZoom() {
                     if (window.innerWidth < 1024) this.zoomLevel = 0.35;
-                    else if (window.innerWidth < 1440) this.zoomLevel = 0.5;
-                    else this.zoomLevel = 0.6;
+                    else if (window.innerWidth < 1440) this.zoomLevel = 0.45;
+                    else this.zoomLevel = 0.55;
                 },
 
                 createScene(image = null) {
@@ -280,33 +290,61 @@
                         id: 's-' + Math.random().toString(36).substr(2, 9),
                         image: image, text: "", fit: 'cover', fontSize: 32,
                         textColor: '#000000', bgColor: '#ffffff', textStyle: 'none', 
-                        fontFamily: 'font-sarabun', textX: 50, textY: 85, textWidth: 80
+                        fontFamily: 'font-sarabun', 
+                        textX: 50, textY: 85, textWidth: 80,
+                        imgX: 50, imgY: 50 // Image Panning
                     };
                 },
 
-                onDragStart(e) {
+                // Dragging Logic
+                onTextDragStart(e) {
                     if (e.target.tagName === 'TEXTAREA') {
-                        if (e.ctrlKey || e.metaKey) this.isDragging = true;
-                        return;
+                        if (e.ctrlKey || e.metaKey) {
+                            this.dragMode = 'text';
+                        } else return;
+                    } else {
+                        this.dragMode = 'text';
                     }
-                    this.isDragging = true;
+                    this.dragStartPos = { x: e.clientX, y: e.clientY };
+                    this.dragStartVal = { x: this.activeScene.textX, y: this.activeScene.textY };
                 },
 
-                onDragMove(e) {
-                    if (!this.isDragging) return;
+                onPageMouseDown(e) {
+                    if (this.dragMode) return;
+                    this.dragMode = 'image';
+                    this.dragStartPos = { x: e.clientX, y: e.clientY };
+                    this.dragStartVal = { x: this.activeScene.imgX, y: this.activeScene.imgY };
+                },
+
+                onGlobalMouseMove(e) {
+                    if (!this.dragMode) return;
+                    
                     const page = document.getElementById('editor-page');
                     const rect = page.getBoundingClientRect();
-                    let x = ((e.clientX - rect.left) / rect.width) * 100;
-                    let y = ((e.clientY - rect.top) / rect.height) * 100;
-                    this.activeScene.textX = Math.max(0, Math.min(100, x));
-                    this.activeScene.textY = Math.max(0, Math.min(100, y));
+                    const dx = ((e.clientX - this.dragStartPos.x) / rect.width) * 100;
+                    const dy = ((e.clientY - this.dragStartPos.y) / rect.height) * 100;
+
+                    if (this.dragMode === 'text') {
+                        this.activeScene.textX = Math.max(0, Math.min(100, this.dragStartVal.x + dx));
+                        this.activeScene.textY = Math.max(0, Math.min(100, this.dragStartVal.y + dy));
+                    } else if (this.dragMode === 'image') {
+                        // Invert image dragging direction to feel like "panning"
+                        this.activeScene.imgX = Math.max(0, Math.min(100, this.dragStartVal.x - dx));
+                        this.activeScene.imgY = Math.max(0, Math.min(100, this.dragStartVal.y - dy));
+                    }
                 },
 
-                onDragEnd() {
-                    if (this.isDragging) {
-                        this.isDragging = false;
+                onGlobalMouseUp() {
+                    if (this.dragMode) {
+                        this.dragMode = null;
                         this.saveToLocal();
                     }
+                },
+
+                resetImagePos() {
+                    this.activeScene.imgX = 50;
+                    this.activeScene.imgY = 50;
+                    this.saveToLocal();
                 },
 
                 snapPosition(pos) {
@@ -358,21 +396,22 @@
 
                 saveToLocal() {
                     try {
-                        localStorage.setItem('storybook_v3_data', JSON.stringify(this.scenes));
+                        localStorage.setItem('storybook_v4_data', JSON.stringify(this.scenes));
                         const now = new Date();
                         this.lastSaved = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
                     } catch(e) {}
                 },
 
                 loadFromLocal() {
-                    const data = localStorage.getItem('storybook_v3_data');
+                    const data = localStorage.getItem('storybook_v4_data');
                     if (data) {
-                        try { this.scenes = JSON.parse(data); } catch(e) { this.addScene(); }
+                        try { 
+                            const parsed = JSON.parse(data);
+                            // migration for old data
+                            this.scenes = parsed.map(s => ({ imgX: 50, imgY: 50, ...s }));
+                        } catch(e) { this.addScene(); }
                     } else this.addScene();
                 },
-
-                zoomIn() { if(this.zoomLevel < 1.3) this.zoomLevel += 0.05; },
-                zoomOut() { if(this.zoomLevel > 0.15) this.zoomLevel -= 0.05; },
 
                 async exportPNG() {
                     if (this.isExporting) return;
@@ -386,7 +425,9 @@
                         for(let i = 0; i < pages.length; i++) {
                             const canvas = await html2canvas(pages[i], { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
                             const a = document.createElement('a');
-                            a.download = `storybook-page-${String(i+1).padStart(2, '0')}.png`;
+                            // Naming 001 - 100
+                            const fileName = String(i + 1).padStart(3, '0');
+                            a.download = `${fileName}.png`;
                             a.href = canvas.toDataURL('image/png');
                             a.click();
                             await new Promise(r => setTimeout(r, 400));
@@ -399,7 +440,7 @@
                 
                 clearAll() {
                     if(confirm('ล้างข้อมูลทั้งหมด?')) {
-                        localStorage.removeItem('storybook_v3_data');
+                        localStorage.removeItem('storybook_v4_data');
                         this.scenes = [this.createScene()];
                         this.activeSceneIndex = 0;
                         this.lastSaved = '';
