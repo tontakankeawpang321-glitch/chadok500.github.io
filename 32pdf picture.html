@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storybook Creator</title>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Petite Vue -->
+<script src="https://unpkg.com/petite-vue" defer init></script>
+
+<!-- html2pdf -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<!-- Icons -->
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&family=Mali:wght@400;600&family=Prompt:wght@300;400;600&family=Anuphan:wght@400;600&family=Chakra+Petch:wght@400;600&family=Niramit:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
+
+/* Fonts */
+.font-sarabun{font-family:'Sarabun'}
+.font-mali{font-family:'Mali'}
+.font-prompt{font-family:'Prompt'}
+.font-anuphan{font-family:'Anuphan'}
+.font-chakra{font-family:'Chakra Petch'}
+.font-niramit{font-family:'Niramit'}
+
+/* Page */
+.a4-page{
+width:210mm;height:297mm;
+background:#fff;position:relative;overflow:hidden;
+box-shadow:0 10px 30px rgba(0,0,0,.25)
+}
+
+/* Text styles */
+.style-none{background:transparent}
+.style-white-card{background:rgba(255,255,255,.9);padding:24px;border-radius:12px}
+.style-black-glass{background:rgba(0,0,0,.6);color:#fff;padding:24px;border-radius:12px}
+.style-paper{background:#fffbf0;border:2px solid #e5e0d0;padding:24px}
+.style-comic{background:#fff;border:3px solid #000;padding:24px;border-radius:16px}
+
+/* PDF */
+.pdf-page{
+width:210mm;height:297mm;
+page-break-after:always;break-after:page;
+position:relative;
+}
+</style>
+</head>
+
+<body v-scope="store()" @mounted="mounted">
+
+<!-- NAVBAR -->
+<nav class="bg-white border-b h-16 flex items-center px-4 sticky top-0 z-50">
+<div class="flex items-center gap-2 font-bold text-lg">
+<i class="ph ph-book-open-text text-indigo-600 text-2xl"></i>
+Storybook Creator
+</div>
+
+<div class="ml-auto flex gap-2">
+<button @click="addScene"
+ class="px-4 py-2 bg-indigo-50 text-indigo-700 rounded">
+<i class="ph ph-plus-circle"></i> เพิ่มหน้า
+</button>
+
+<label class="px-4 py-2 bg-green-50 text-green-700 rounded cursor-pointer">
+<i class="ph ph-images"></i> เพิ่มรูป
+<input type="file" multiple accept="image/*" hidden @change="bulkUpload">
+</label>
+
+<button @click="exportPDF"
+ :disabled="isExporting"
+ class="px-4 py-2 bg-indigo-600 text-white rounded">
+{{ isExporting?'กำลังสร้าง…':'Export PDF' }}
+</button>
+</div>
+</nav>
+
+<div class="flex h-[calc(100vh-64px)]">
+
+<!-- SIDEBAR -->
+<aside class="w-64 bg-white border-r p-2 overflow-y-auto">
+<div class="font-semibold text-sm mb-2">ฉาก ({{ scenes.length }})</div>
+
+<div v-for="(s,i) in scenes" :key="s.id"
+ @click="activeSceneIndex=i"
+ draggable="true"
+ @dragstart="dragStart(i,$event)"
+ @drop="dragDrop(i)"
+ @dragover.prevent
+ class="border rounded p-2 mb-2 cursor-pointer"
+ :class="activeSceneIndex===i?'border-indigo-500 bg-indigo-50':'border-gray-300'">
+หน้า {{ i+1 }}
+</div>
+</aside>
+
+<!-- MAIN -->
+<main class="flex-1 bg-gray-200 flex flex-col">
+
+<!-- TOOLBAR -->
+<div class="bg-white border-b p-2 flex flex-wrap gap-3 text-sm">
+<select v-model="activeScene.fontFamily" class="border rounded px-2">
+<option value="font-sarabun">Sarabun</option>
+<option value="font-mali">Mali</option>
+<option value="font-prompt">Prompt</option>
+<option value="font-anuphan">Anuphan</option>
+<option value="font-chakra">Chakra</option>
+<option value="font-niramit">Niramit</option>
+</select>
+
+<select v-model="activeScene.textStyle" class="border rounded px-2">
+<option value="none">ไม่มีกรอบ</option>
+<option value="white-card">การ์ดขาว</option>
+<option value="black-glass">กระจกดำ</option>
+<option value="paper">กระดาษ</option>
+<option value="comic">การ์ตูน</option>
+</select>
+
+<input type="number" v-model="activeScene.fontSize"
+ class="border rounded w-16 px-2">
+
+<input type="color" v-model="activeScene.textColor">
+
+<select v-model="activeScene.textPosition" class="border rounded px-2">
+<option value="top">บน</option>
+<option value="center">กลาง</option>
+<option value="bottom">ล่าง</option>
+</select>
+
+<select v-model="activeScene.fit" class="border rounded px-2">
+<option value="cover">เต็มหน้า</option>
+<option value="contain">พอดี</option>
+</select>
+
+<input type="color" v-model="activeScene.bgColor">
+</div>
+
+<!-- CANVAS -->
+<div class="flex-1 flex justify-center items-center overflow-auto">
+<div class="a4-page"
+ :style="{backgroundColor:activeScene.bgColor,transform:'scale('+zoom+')'}">
+
+<img v-if="activeScene.image"
+ :src="activeScene.image"
+ class="absolute inset-0 w-full h-full"
+ :style="{objectFit:activeScene.fit}">
+
+<div class="absolute inset-0 p-8 flex justify-center"
+ :style="{alignItems:
+ activeScene.textPosition==='top'?'flex-start':
+ activeScene.textPosition==='center'?'center':'flex-end'}">
+
+<div :class="['style-'+activeScene.textStyle,activeScene.fontFamily]"
+ class="w-full text-center">
+
+<textarea v-model="activeScene.text"
+ class="w-full bg-transparent resize-none outline-none text-center"
+ :style="{fontSize:activeScene.fontSize+'px',color:activeScene.textColor}"
+ placeholder="พิมพ์ข้อความ…"></textarea>
+
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+<!-- PDF EXPORT ROOT (FIXED) -->
+<div id="pdf-export-root"
+ style="position:fixed;top:0;left:0;visibility:hidden;z-index:-1">
+
+<div v-for="scene in scenes" :key="scene.id"
+ class="pdf-page"
+ :style="{backgroundColor:scene.bgColor}">
+
+<img v-if="scene.image"
+ :src="scene.image"
+ style="position:absolute;inset:0;width:100%;height:100%"
+ :style="{objectFit:scene.fit}">
+
+<div style="position:absolute;inset:0;padding:40px;
+ display:flex;justify-content:center"
+ :style="{alignItems:
+ scene.textPosition==='top'?'flex-start':
+ scene.textPosition==='center'?'center':'flex-end'}">
+
+<div :class="['style-'+scene.textStyle,scene.fontFamily]"
+ style="width:100%;text-align:center;
+ white-space:pre-wrap;word-break:break-word;line-height:1.6"
+ :style="{fontSize:scene.fontSize+'px',color:scene.textColor}"
+ v-text="scene.text"></div>
+
+</div>
+</div>
+</div>
+
+<script>
+function store(){
+return{
+scenes:[],
+activeSceneIndex:0,
+zoom:0.6,
+isExporting:false,
+dragged:null,
+
+get activeScene(){return this.scenes[this.activeSceneIndex]||{}},
+
+mounted(){this.addScene()},
+
+createScene(img=null){
+return{
+id:Math.random().toString(36).slice(2),
+image:img,
+text:'',
+fit:'cover',
+fontSize:32,
+textColor:'#000000',
+bgColor:'#ffffff',
+textStyle:'none',
+fontFamily:'font-sarabun',
+textPosition:'bottom'
+}
+},
+
+addScene(){this.scenes.push(this.createScene());this.activeSceneIndex=this.scenes.length-1},
+
+bulkUpload(e){
+[...e.target.files].forEach(f=>{
+const r=new FileReader();
+r.onload=x=>this.scenes.push(this.createScene(x.target.result));
+r.readAsDataURL(f);
+});
+},
+
+dragStart(i){this.dragged=i},
+dragDrop(i){
+const t=this.scenes.splice(this.dragged,1)[0];
+this.scenes.splice(i,0,t);
+this.activeSceneIndex=i;
+},
+
+async exportPDF(){
+this.isExporting=true;
+await new Promise(r=>requestAnimationFrame(r));
+await document.fonts.ready;
+
+await html2pdf().set({
+margin:0,
+filename:'storybook-'+Date.now()+'.pdf',
+image:{type:'jpeg',quality:.98},
+html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},
+jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+})
+.from(document.getElementById('pdf-export-root')).save();
+
+this.isExporting=false;
+}
+}}
+</script>
+
+</body>
+</html>
