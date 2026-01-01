@@ -1,271 +1,413 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Storybook Creator - สร้างนิทานภาพและ PDF</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storybook Creator - PDF / PNG (Draggable Text)</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/petite-vue" defer init></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600&family=Chakra+Petch:wght@400;600&family=Mali:wght@400;600&family=Niramit:wght@400;600&family=Prompt:wght@300;400;600&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
 
-<!-- Libraries -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/petite-vue" defer init></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+        .font-sarabun { font-family: 'Sarabun', sans-serif; }
+        .font-anuphan { font-family: 'Anuphan', sans-serif; }
+        .font-mali { font-family: 'Mali', cursive; }
+        .font-prompt { font-family: 'Prompt', sans-serif; }
+        .font-chakra { font-family: 'Chakra Petch', sans-serif; }
+        .font-niramit { font-family: 'Niramit', sans-serif; }
+        
+        .a4-page {
+            width: 210mm; height: 297mm;
+            background-color: white; position: relative;
+            overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transform-origin: top center;
+            user-select: none;
+        }
 
-<!-- Fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600&family=Chakra+Petch:wght@400;600&family=Mali:wght@400;600&family=Niramit:wght@400;600&family=Prompt:wght@300;400;600&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-<style>
-body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
-.font-sarabun{font-family:'Sarabun'}
-.font-anuphan{font-family:'Anuphan'}
-.font-mali{font-family:'Mali'}
-.font-prompt{font-family:'Prompt'}
-.font-chakra{font-family:'Chakra Petch'}
-.font-niramit{font-family:'Niramit'}
+        .loader {
+            border: 3px solid #f3f3f3; border-top: 3px solid #ffffff;
+            border-radius: 50%; width: 18px; height: 18px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-.a4-page{
-    width:210mm;height:297mm;
-    background:white;
-    position:relative;
-    overflow:hidden;
-    box-shadow:0 4px 6px -1px rgba(0,0,0,.1);
-    transform-origin:top center;
-}
+        /* Text Box Styles */
+        .style-none { background: transparent; }
+        .style-white-card { background-color: rgba(255, 255, 255, 0.9); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .style-black-glass { background-color: rgba(0, 0, 0, 0.6); border-radius: 12px; color: white !important; padding: 1.5rem; backdrop-filter: blur(4px); }
+        .style-paper { background-color: #fffbf0; border: 2px solid #e5e0d0; border-radius: 4px; padding: 1.5rem; }
+        .style-comic { background-color: white; border: 3px solid black; border-radius: 16px; padding: 1.5rem; }
 
-.style-none{background:transparent}
-.style-white-card{background:rgba(255,255,255,.9);border-radius:12px;padding:1.5rem}
-.style-black-glass{background:rgba(0,0,0,.6);color:white!important;border-radius:12px;padding:1.5rem}
-.style-paper{background:#fffbf0;border:2px solid #e5e0d0;border-radius:4px;padding:1.5rem}
-.style-comic{background:white;border:3px solid black;border-radius:16px;padding:1.5rem}
+        .text-wrapper {
+            position: absolute;
+            width: 80%;
+            cursor: move;
+            transition: outline 0.2s;
+            z-index: 10;
+        }
+        .text-wrapper:hover { outline: 2px dashed #4f46e5; }
+        .text-wrapper:active { outline: 2px solid #4f46e5; cursor: grabbing; }
 
-.pdf-page{
-    width:210mm;
-    height:296.8mm;
-    page-break-after:always;
-    position:relative;
-    overflow:hidden;
-    background:white;
-}
-.pdf-text-content{
-    word-wrap:break-word;
-    overflow-wrap:break-word;
-    white-space:pre-wrap;
-    width:100%;
-}
-</style>
+        /* PDF/PNG Export Styling */
+        .pdf-page {
+            width: 210mm; height: 296.8mm;
+            page-break-after: always; position: relative;
+            overflow: hidden; background-color: white;
+        }
+        .pdf-text-content {
+            word-wrap: break-word; overflow-wrap: break-word;
+            white-space: pre-wrap; width: 100%; display: block;
+        }
+    </style>
 </head>
-
 <body v-scope="store()" @mounted="mounted">
 
-<!-- Navbar -->
-<nav class="bg-white shadow-sm border-b px-4 py-3 flex justify-between items-center sticky top-0 z-50 h-16">
-    <div class="flex items-center gap-2">
-        <i class="ph ph-book-open-text text-3xl text-indigo-600"></i>
-        <h1 class="text-xl font-bold text-gray-800 font-mali">Storybook Creator</h1>
-        <span v-if="lastSaved" class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded ml-2">
-            บันทึกแล้ว: {{ lastSaved }}
-        </span>
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm border-b px-4 py-3 flex justify-between items-center sticky top-0 z-50 h-16">
+        <div class="flex items-center gap-2">
+            <i class="ph ph-book-open-text text-3xl text-indigo-600"></i>
+            <h1 class="text-xl font-bold text-gray-800 font-mali">Storybook Creator</h1>
+            <span v-if="lastSaved" class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded ml-2">บันทึกแล้ว: {{ lastSaved }}</span>
+        </div>
+        <div class="flex gap-2">
+            <button @click="addScene" class="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition font-semibold text-sm">
+                <i class="ph ph-plus-circle text-lg"></i> เพิ่มหน้า
+            </button>
+            <label class="flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition font-semibold text-sm cursor-pointer">
+                <i class="ph ph-images text-lg"></i> อัปโหลดรูป
+                <input type="file" accept="image/*" multiple class="hidden" @change="handleBulkUpload($event)">
+            </label>
+            <button @click="exportPDF" :disabled="isExporting" class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
+                <i class="ph ph-file-pdf text-lg"></i> PDF
+            </button>
+            <button @click="exportPNG" :disabled="isExporting" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
+                <i class="ph ph-image text-lg"></i> PNG
+            </button>
+        </div>
+    </nav>
+
+    <div class="flex h-[calc(100vh-64px)] overflow-hidden">
+        
+        <!-- Left Sidebar -->
+        <aside class="w-64 bg-white border-r flex flex-col z-10 shrink-0">
+            <div class="p-3 bg-gray-50 border-b font-semibold text-gray-500 text-sm flex justify-between items-center">
+                <span>หน้านิทาน ({{ scenes.length }})</span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-2 space-y-2 no-scrollbar">
+                <div v-for="(scene, index) in scenes" :key="scene.id"
+                    @click="activeSceneIndex = index"
+                    class="p-2 rounded-lg cursor-pointer border-2 transition group relative"
+                    :class="activeSceneIndex === index ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-gray-400">#{{ index + 1 }}</span>
+                        <button @click.stop="deleteScene(index)" class="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded transition">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+                    <div class="aspect-[210/297] bg-white rounded border overflow-hidden relative shadow-sm pointer-events-none">
+                        <div class="absolute inset-0" :style="{ backgroundColor: scene.bgColor }"></div>
+                        <img v-if="scene.image" :src="scene.image" class="absolute inset-0 w-full h-full object-cover">
+                        <div v-else class="absolute inset-0 flex items-center justify-center text-gray-200">
+                            <i class="ph ph-image text-2xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 border-t">
+                <button @click="clearAll" class="w-full py-2 text-xs text-red-500 border border-red-200 rounded hover:bg-red-50 transition">ล้างข้อมูลทั้งหมด</button>
+            </div>
+        </aside>
+
+        <!-- Main Editor -->
+        <main class="flex-1 bg-zinc-700 relative flex flex-col min-w-0" @mousemove="onDragMove" @mouseup="onDragEnd" @mouseleave="onDragEnd">
+            
+            <!-- Toolbar -->
+            <div class="bg-white border-b px-4 py-2 flex flex-wrap gap-x-6 gap-y-2 items-center z-20 shadow-sm text-sm">
+                <div class="flex items-center gap-2 border-r pr-4">
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">รูปภาพ</span>
+                    <label class="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition font-medium">เปลี่ยนรูป<input type="file" accept="image/*" class="hidden" @change="handleSingleImageReplace($event)"></label>
+                    <select v-model="activeScene.fit" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50">
+                        <option value="cover">เต็มหน้า (Crop)</option>
+                        <option value="contain">พอดีหน้า (Fit)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 border-r pr-4">
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">ข้อความ</span>
+                    <select v-model="activeScene.fontFamily" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50 w-28">
+                        <option value="font-sarabun">Sarabun</option>
+                        <option value="font-mali">Mali</option>
+                        <option value="font-prompt">Prompt</option>
+                        <option value="font-anuphan">Anuphan</option>
+                    </select>
+                    <select v-model="activeScene.textStyle" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50">
+                        <option value="none">ไม่มีกรอบ</option>
+                        <option value="white-card">การ์ดขาว</option>
+                        <option value="black-glass">กระจกดำ</option>
+                        <option value="paper">กระดาษ</option>
+                        <option value="comic">การ์ตูน</option>
+                    </select>
+                    <input type="number" v-model="activeScene.fontSize" @input="saveToLocal" class="w-14 border rounded px-2 py-1.5 bg-gray-50 text-center">
+                    <input type="color" v-model="activeScene.textColor" @input="saveToLocal" class="w-8 h-8 rounded-md cursor-pointer border">
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">ตำแหน่งด่วน</span>
+                    <button @click="snapPosition('top')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-top"></i></button>
+                    <button @click="snapPosition('center')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-center-horizontal"></i></button>
+                    <button @click="snapPosition('bottom')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-bottom"></i></button>
+                    <span class="text-[10px] text-gray-400 italic">(ลากที่ข้อความเพื่อย้ายอิสระ)</span>
+                </div>
+
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">พื้นหลัง</span>
+                    <input type="color" v-model="activeScene.bgColor" @input="saveToLocal" class="w-8 h-8 rounded-md cursor-pointer border">
+                </div>
+            </div>
+
+            <!-- Canvas -->
+            <div class="flex-1 overflow-auto flex justify-center py-12 px-4 scroll-smooth">
+                <div id="editor-page" class="a4-page shadow-2xl transition-all duration-300"
+                    :style="{ transform: 'scale(' + zoomLevel + ')', backgroundColor: activeScene.bgColor }">
+                    <img v-if="activeScene.image" :src="activeScene.image" class="absolute inset-0 w-full h-full pointer-events-none" :style="{ objectFit: activeScene.fit }">
+                    
+                    <!-- Draggable Text Wrapper -->
+                    <div class="text-wrapper" 
+                        @mousedown="onDragStart"
+                        :style="{ 
+                            left: activeScene.textX + '%', 
+                            top: activeScene.textY + '%', 
+                            transform: 'translate(-50%, -50%)' 
+                        }">
+                        <div class="pointer-events-auto" :class="['style-' + activeScene.textStyle, activeScene.fontFamily]">
+                            <textarea 
+                                v-model="activeScene.text"
+                                @input="saveToLocal"
+                                placeholder="เริ่มเขียนที่นี่ (ลากย้ายได้)..."
+                                class="w-full bg-transparent resize-none focus:outline-none rounded text-center leading-relaxed block overflow-hidden"
+                                :style="{ fontSize: activeScene.fontSize + 'px', color: activeScene.textColor }"
+                                oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                            ></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zoom -->
+            <div class="absolute bottom-6 right-6 flex gap-2 bg-white/90 backdrop-blur rounded-full shadow-xl p-2 border border-white/20 z-30">
+                <button @click="zoomOut" class="p-2 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center"><i class="ph ph-minus font-bold"></i></button>
+                <span class="flex items-center text-sm font-bold w-14 justify-center text-indigo-600">{{ Math.round(zoomLevel * 100) }}%</span>
+                <button @click="zoomIn" class="p-2 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center"><i class="ph ph-plus font-bold"></i></button>
+            </div>
+        </main>
     </div>
-    <div class="flex gap-3">
-        <button @click="addScene"
-            class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-semibold text-sm">
-            <i class="ph ph-plus-circle"></i> เพิ่มหน้า
-        </button>
 
-        <label class="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 font-semibold text-sm cursor-pointer">
-            <i class="ph ph-images"></i> อัปโหลดรูป
-            <input type="file" accept="image/*" multiple hidden @change="handleBulkUpload">
-        </label>
-
-        <button @click="exportPDF" :disabled="isExporting"
-            class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50">
-            PDF
-        </button>
-
-        <!-- ✅ เพิ่มปุ่ม PNG -->
-        <button @click="exportPNG" :disabled="isExporting"
-            class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50">
-            PNG
-        </button>
-    </div>
-</nav>
-
-<!-- ===== Layout ===== -->
-<div class="flex h-[calc(100vh-64px)] overflow-hidden">
-
-<!-- Sidebar -->
-<aside class="w-64 bg-white border-r flex flex-col">
-    <div class="p-3 bg-gray-50 border-b text-sm font-semibold text-gray-500">
-        หน้านิทาน ({{ scenes.length }})
-    </div>
-    <div class="flex-1 overflow-y-auto p-2 space-y-2">
-        <div v-for="(scene,i) in scenes" :key="scene.id"
-            @click="activeSceneIndex=i"
-            class="p-2 border rounded cursor-pointer"
-            :class="activeSceneIndex===i?'border-indigo-500 bg-indigo-50':'border-gray-200'">
-            <div class="text-xs text-gray-400 mb-1">#{{ i+1 }}</div>
-            <div class="aspect-[210/297] bg-white border relative overflow-hidden">
-                <img v-if="scene.image" :src="scene.image"
-                    class="absolute inset-0 w-full h-full object-cover">
+    <!-- Export Root -->
+    <div id="pdf-export-root" style="position: fixed; left: -10000px; top: 0; width: 210mm;">
+        <div v-for="scene in scenes" :key="'ex-' + scene.id" class="pdf-page" :style="{ backgroundColor: scene.bgColor }">
+            <img v-if="scene.image" :src="scene.image" style="width:100%;height:100%;" :style="{ objectFit: scene.fit }">
+            <div style="position: absolute; width: 80%; transform: translate(-50%, -50%);"
+                 :style="{ left: scene.textX + '%', top: scene.textY + '%' }">
+                <div :class="['style-' + scene.textStyle, scene.fontFamily, 'pdf-text-content']"
+                     style="text-align: center; width: 100%; min-height: 1em;"
+                     :style="{ fontSize: scene.fontSize + 'px', color: scene.textColor }">
+                    {{ scene.text || '' }}
+                </div>
             </div>
         </div>
     </div>
-</aside>
 
-<!-- Editor -->
-<main class="flex-1 bg-zinc-700 flex justify-center items-start py-12">
-    <div class="a4-page"
-        :style="{backgroundColor:activeScene.bgColor, transform:'scale('+zoomLevel+')'}">
+    <script>
+        function store() {
+            return {
+                scenes: [],
+                activeSceneIndex: 0,
+                zoomLevel: 0.5,
+                isExporting: false,
+                lastSaved: '',
+                isDragging: false,
 
-        <img v-if="activeScene.image"
-            :src="activeScene.image"
-            class="absolute inset-0 w-full h-full"
-            :style="{objectFit:activeScene.fit}">
+                get activeScene() { return this.scenes[this.activeSceneIndex] || {}; },
 
-        <div class="absolute inset-0 p-12 flex"
-            :style="{justifyContent:
-                activeScene.textPosition==='top'?'flex-start':
-                activeScene.textPosition==='bottom'?'flex-end':'center'}">
+                mounted() {
+                    this.loadFromLocal();
+                    this.updateZoom();
+                    window.addEventListener('resize', () => this.updateZoom());
+                },
 
-            <div class="w-full"
-                :class="['style-'+activeScene.textStyle,activeScene.fontFamily]">
+                updateZoom() {
+                    if (window.innerWidth < 1024) this.zoomLevel = 0.35;
+                    else if (window.innerWidth < 1440) this.zoomLevel = 0.5;
+                    else this.zoomLevel = 0.6;
+                },
 
-                <textarea v-model="activeScene.text"
-                    class="w-full bg-transparent resize-none outline-none text-center"
-                    :style="{fontSize:activeScene.fontSize+'px',color:activeScene.textColor}"
-                    @input="saveToLocal">
-                </textarea>
+                createScene(image = null) {
+                    return {
+                        id: 's-' + Math.random().toString(36).substr(2, 9),
+                        image: image, text: "", fit: 'cover', fontSize: 32,
+                        textColor: '#000000', bgColor: '#ffffff', textStyle: 'none', 
+                        fontFamily: 'font-sarabun', textX: 50, textY: 85
+                    };
+                },
 
-            </div>
-        </div>
-    </div>
-</main>
-</div>
+                onDragStart(e) {
+                    if (e.target.tagName === 'TEXTAREA') {
+                        // เช็คว่ากดที่ตัวอักษรหรือกดขอบเพื่อลาก
+                        if (e.ctrlKey || e.metaKey) this.isDragging = true;
+                        return; // ยอมให้พิมพ์ได้ปกติ
+                    }
+                    this.isDragging = true;
+                },
 
-<!-- ===== PDF / PNG ROOT ===== -->
-<div id="pdf-export-root"
-    style="position:fixed;left:-10000px;top:0;width:210mm;background:white">
+                onDragMove(e) {
+                    if (!this.isDragging) return;
+                    const page = document.getElementById('editor-page');
+                    const rect = page.getBoundingClientRect();
+                    
+                    // คำนวณตำแหน่งเมาส์สัมพันธ์กับหน้ากระดาษ (0-100%)
+                    let x = ((e.clientX - rect.left) / rect.width) * 100;
+                    let y = ((e.clientY - rect.top) / rect.height) * 100;
 
-    <div v-for="scene in scenes" :key="'pdf-'+scene.id"
-        class="pdf-page" :style="{backgroundColor:scene.bgColor}">
+                    // จำกัดขอบเขตไม่ให้หลุดหน้า (ขอบ 5%)
+                    this.activeScene.textX = Math.max(5, Math.min(95, x));
+                    this.activeScene.textY = Math.max(5, Math.min(95, y));
+                },
 
-        <img v-if="scene.image" :src="scene.image"
-            style="width:100%;height:100%;object-fit:cover">
+                onDragEnd() {
+                    if (this.isDragging) {
+                        this.isDragging = false;
+                        this.saveToLocal();
+                    }
+                },
 
-        <div style="position:absolute;inset:0;padding:60px;display:flex"
-            :style="{justifyContent:
-                scene.textPosition==='top'?'flex-start':
-                scene.textPosition==='bottom'?'flex-end':'center'}">
+                snapPosition(pos) {
+                    this.activeScene.textX = 50;
+                    if (pos === 'top') this.activeScene.textY = 15;
+                    if (pos === 'center') this.activeScene.textY = 50;
+                    if (pos === 'bottom') this.activeScene.textY = 85;
+                    this.saveToLocal();
+                },
 
-            <div :class="['style-'+scene.textStyle,scene.fontFamily,'pdf-text-content']"
-                :style="{fontSize:scene.fontSize+'px',color:scene.textColor,textAlign:'center'}">
-                {{ scene.text }}
-            </div>
-        </div>
-    </div>
-</div>
+                addScene() {
+                    this.scenes.push(this.createScene());
+                    this.activeSceneIndex = this.scenes.length - 1;
+                    this.saveToLocal();
+                },
 
-<script>
-function store(){
-return{
-    scenes:[],
-    activeSceneIndex:0,
-    zoomLevel:.5,
-    isExporting:false,
-    lastSaved:'',
+                handleBulkUpload(event) {
+                    const files = Array.from(event.target.files);
+                    if (!files.length) return;
+                    let isFirstEmpty = (this.scenes.length === 1 && !this.activeScene.image && !this.activeScene.text);
+                    files.forEach((file, idx) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            if (idx === 0 && isFirstEmpty) this.scenes[0].image = e.target.result;
+                            else this.scenes.push(this.createScene(e.target.result));
+                            this.saveToLocal();
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                    event.target.value = '';
+                },
 
-    get activeScene(){return this.scenes[this.activeSceneIndex]||{}},
+                handleSingleImageReplace(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => { this.activeScene.image = e.target.result; this.saveToLocal(); };
+                        reader.readAsDataURL(file);
+                    }
+                },
 
-    mounted(){
-        const d=localStorage.getItem('storybook_data');
-        this.scenes=d?JSON.parse(d):[this.createScene()];
-    },
+                deleteScene(index) {
+                    if (this.scenes.length > 1) {
+                        this.scenes.splice(index, 1);
+                        if (this.activeSceneIndex >= this.scenes.length) this.activeSceneIndex = this.scenes.length - 1;
+                    } else this.scenes[0] = this.createScene();
+                    this.saveToLocal();
+                },
 
-    createScene(img=null){
-        return{
-            id:Math.random().toString(36).slice(2),
-            image:img,
-            text:'',
-            fit:'cover',
-            fontSize:32,
-            textColor:'#000000',
-            bgColor:'#ffffff',
-            textStyle:'none',
-            fontFamily:'font-sarabun',
-            textPosition:'bottom'
+                saveToLocal() {
+                    try {
+                        localStorage.setItem('storybook_v2_data', JSON.stringify(this.scenes));
+                        const now = new Date();
+                        this.lastSaved = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                    } catch(e) {}
+                },
+
+                loadFromLocal() {
+                    const data = localStorage.getItem('storybook_v2_data');
+                    if (data) {
+                        try { this.scenes = JSON.parse(data); } catch(e) { this.addScene(); }
+                    } else this.addScene();
+                },
+
+                zoomIn() { if(this.zoomLevel < 1.3) this.zoomLevel += 0.05; },
+                zoomOut() { if(this.zoomLevel > 0.15) this.zoomLevel -= 0.05; },
+
+                async exportPDF() {
+                    if (this.isExporting) return;
+                    this.isExporting = true;
+                    try {
+                        await new Promise(r => setTimeout(r, 800));
+                        const element = document.getElementById('pdf-export-root');
+                        const opt = {
+                            margin: 0, filename: `story-${Date.now()}.pdf`,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2, useCORS: true },
+                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                            pagebreak: { mode: 'css', after: '.pdf-page' }
+                        };
+                        await html2pdf().set(opt).from(element).save();
+                    } finally { this.isExporting = false; }
+                },
+
+                async exportPNG() {
+                    if (this.isExporting) return;
+                    this.isExporting = true;
+                    const root = document.getElementById('pdf-export-root');
+                    const oldStyle = root.getAttribute('style');
+                    try {
+                        root.setAttribute('style', 'position:relative;left:0;top:0;width:210mm;background:white;z-index:9999');
+                        await new Promise(r => setTimeout(r, 600));
+                        const pages = root.querySelectorAll('.pdf-page');
+                        for(let i = 0; i < pages.length; i++) {
+                            const canvas = await html2canvas(pages[i], { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+                            const a = document.createElement('a');
+                            a.download = `page-${String(i+1).padStart(2, '0')}.png`;
+                            a.href = canvas.toDataURL('image/png');
+                            a.click();
+                            await new Promise(r => setTimeout(r, 400));
+                        }
+                    } finally {
+                        root.setAttribute('style', oldStyle);
+                        this.isExporting = false;
+                    }
+                },
+                
+                clearAll() {
+                    if(confirm('ล้างข้อมูลทั้งหมด?')) {
+                        localStorage.removeItem('storybook_v2_data');
+                        this.scenes = [this.createScene()];
+                        this.activeSceneIndex = 0;
+                        this.lastSaved = '';
+                    }
+                }
+            }
         }
-    },
-
-    addScene(){
-        this.scenes.push(this.createScene());
-        this.activeSceneIndex=this.scenes.length-1;
-        this.saveToLocal();
-    },
-
-    handleBulkUpload(e){
-        [...e.target.files].forEach(f=>{
-            const r=new FileReader();
-            r.onload=ev=>{
-                this.scenes.push(this.createScene(ev.target.result));
-                this.saveToLocal();
-            };
-            r.readAsDataURL(f);
-        });
-        e.target.value='';
-    },
-
-    saveToLocal(){
-        localStorage.setItem('storybook_data',JSON.stringify(this.scenes));
-        const n=new Date();
-        this.lastSaved=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
-    },
-
-    async exportPDF(){
-        this.isExporting=true;
-        await new Promise(r=>setTimeout(r,800));
-        await html2pdf().set({
-            margin:0,
-            filename:`storybook-${Date.now()}.pdf`,
-            image:{type:'jpeg',quality:.98},
-            html2canvas:{scale:2,useCORS:true},
-            jsPDF:{unit:'mm',format:'a4'}
-        }).from(document.getElementById('pdf-export-root')).save();
-        this.isExporting=false;
-    },
-
-    /* ✅ PNG (แก้หน้าขาวแล้ว) */
-    async exportPNG(){
-        if(this.isExporting) return;
-        this.isExporting=true;
-
-        const root=document.getElementById('pdf-export-root');
-        const oldStyle=root.getAttribute('style');
-
-        root.setAttribute('style',
-            'position:relative;left:0;top:0;width:210mm;background:white;z-index:9999');
-
-        await new Promise(r=>setTimeout(r,500));
-
-        const pages=root.querySelectorAll('.pdf-page');
-        for(let i=0;i<pages.length;i++){
-            const canvas=await html2canvas(pages[i],{
-                scale:3,useCORS:true,backgroundColor:'#fff'
-            });
-            const a=document.createElement('a');
-            a.download=`storybook-page-${String(i+1).padStart(2,'0')}.png`;
-            a.href=canvas.toDataURL('image/png');
-            a.click();
-            await new Promise(r=>setTimeout(r,300));
-        }
-
-        root.setAttribute('style',oldStyle);
-        this.isExporting=false;
-    }
-}}
-</script>
-
+    </script>
 </body>
 </html>
