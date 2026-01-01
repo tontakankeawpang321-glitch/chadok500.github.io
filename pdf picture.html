@@ -44,11 +44,11 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
         .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #4f46e5;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #ffffff;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 18px;
+            height: 18px;
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -83,14 +83,26 @@
             border-top: 4px solid #4f46e5 !important;
         }
 
-        /* PDF Specific Fixes */
+        /* PDF Export Styling */
         .pdf-page {
             width: 210mm;
-            height: 297mm;
+            height: 296.8mm; /* ปรับลดนิดหน่อยเพื่อป้องกันหน้าเกิน */
+            page-break-after: always;
             position: relative;
             overflow: hidden;
-            page-break-after: always;
-            background: white;
+            background-color: white;
+        }
+        
+        .pdf-text-content {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            width: 100%;
+            display: block;
+        }
+
+        #pdf-export-root {
+            font-family: 'Sarabun', sans-serif;
         }
     </style>
 </head>
@@ -101,20 +113,21 @@
         <div class="flex items-center gap-2">
             <i class="ph ph-book-open-text text-3xl text-indigo-600"></i>
             <h1 class="text-xl font-bold text-gray-800 font-mali">Storybook Creator</h1>
+            <span v-if="lastSaved" class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded ml-2">บันทึกแล้ว: {{ lastSaved }}</span>
         </div>
         <div class="flex gap-3">
             <button @click="addScene" class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition font-semibold text-sm">
-                <i class="ph ph-plus-circle text-lg"></i> เพิ่มหน้าว่าง
+                <i class="ph ph-plus-circle text-lg"></i> เพิ่มหน้า
             </button>
             
             <label class="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition font-semibold text-sm cursor-pointer">
-                <i class="ph ph-images text-lg"></i> เพิ่มรูปหลายรูป
+                <i class="ph ph-images text-lg"></i> อัปโหลดรูปภาพ
                 <input type="file" accept="image/*" multiple class="hidden" @change="handleBulkUpload($event)">
             </label>
 
-            <button @click="exportPDF" :disabled="isExporting" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
-                <span v-if="!isExporting"><i class="ph ph-file-pdf text-lg"></i> Export PDF</span>
-                <span v-else class="flex items-center gap-2"><div class="loader"></div> กำลังสร้าง...</span>
+            <button @click="exportPDF" :disabled="isExporting" class="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
+                <span v-if="!isExporting" class="flex items-center gap-2"><i class="ph ph-file-pdf text-lg"></i> Export PDF</span>
+                <span v-else class="flex items-center gap-2"><div class="loader"></div> กำลังสร้างไฟล์...</span>
             </button>
         </div>
     </nav>
@@ -122,10 +135,10 @@
     <!-- Main Layout -->
     <div class="flex h-[calc(100vh-64px)] overflow-hidden">
         
-        <!-- Left Sidebar -->
+        <!-- Left Sidebar: Scene List -->
         <aside class="w-64 bg-white border-r flex flex-col z-10 shrink-0">
             <div class="p-3 bg-gray-50 border-b font-semibold text-gray-500 text-sm flex justify-between items-center">
-                <span>รายการฉาก ({{ scenes.length }})</span>
+                <span>หน้านิทาน ({{ scenes.length }})</span>
             </div>
             <div class="flex-1 overflow-y-auto p-2 space-y-2 no-scrollbar">
                 <div 
@@ -144,9 +157,7 @@
                     ]"
                 >
                     <div class="flex justify-between items-center mb-1">
-                        <span class="text-xs font-bold text-gray-500">
-                            <i class="ph ph-dots-six-vertical mr-1"></i> หน้าที่ {{ index + 1 }}
-                        </span>
+                        <span class="text-xs font-bold text-gray-400">#{{ index + 1 }}</span>
                         <button @click.stop="deleteScene(index)" class="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded transition">
                             <i class="ph ph-trash"></i>
                         </button>
@@ -154,55 +165,61 @@
                     <div class="aspect-[210/297] bg-white rounded border overflow-hidden relative shadow-sm pointer-events-none">
                         <div class="absolute inset-0" :style="{ backgroundColor: scene.bgColor }"></div>
                         <img v-if="scene.image" :src="scene.image" class="absolute inset-0 w-full h-full object-cover">
-                        <div v-else class="absolute inset-0 flex items-center justify-center text-gray-300">
+                        <div v-else class="absolute inset-0 flex items-center justify-center text-gray-200">
                             <i class="ph ph-image text-2xl"></i>
                         </div>
                     </div>
                 </div>
             </div>
+            <div class="p-4 border-t">
+                <button @click="clearAll" class="w-full py-2 text-xs text-red-500 border border-red-200 rounded hover:bg-red-50 transition">
+                    ล้างข้อมูลทั้งหมด
+                </button>
+            </div>
         </aside>
 
         <!-- Center: Editor -->
-        <main class="flex-1 bg-gray-100 relative flex flex-col min-w-0">
+        <main class="flex-1 bg-zinc-700 relative flex flex-col min-w-0">
             
-            <!-- Toolbar -->
+            <!-- Contextual Toolbar -->
             <div class="bg-white border-b px-4 py-2 flex flex-wrap gap-x-6 gap-y-2 items-center z-20 shadow-sm text-sm">
                 <div class="flex items-center gap-2 border-r pr-4">
-                    <span class="text-gray-500 font-semibold">ภาพ:</span>
-                    <label class="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded hover:bg-blue-100 transition">
-                        เลือกภาพใหม่
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">รูปภาพ</span>
+                    <label class="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition font-medium">
+                        เปลี่ยนรูป
                         <input type="file" accept="image/*" class="hidden" @change="handleSingleImageReplace($event)">
                     </label>
-                    <select v-model="activeScene.fit" class="border rounded px-2 py-1.5 bg-gray-50">
-                        <option value="cover">เต็มหน้า</option>
-                        <option value="contain">พอดีหน้า</option>
+                    <select v-model="activeScene.fit" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50">
+                        <option value="cover">เต็มหน้า (Crop)</option>
+                        <option value="contain">พอดีหน้า (Fit)</option>
                     </select>
                 </div>
 
                 <div class="flex items-center gap-2 border-r pr-4">
-                    <span class="text-gray-500 font-semibold">ฟอนต์:</span>
-                    <select v-model="activeScene.fontFamily" class="border rounded px-2 py-1.5 bg-gray-50 w-28">
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">ข้อความ</span>
+                    <select v-model="activeScene.fontFamily" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50 w-28">
                         <option value="font-sarabun">Sarabun</option>
-                        <option value="font-mali">Mali</option>
+                        <option value="font-mali">Mali (เขียน)</option>
                         <option value="font-prompt">Prompt</option>
                         <option value="font-anuphan">Anuphan</option>
-                        <option value="font-chakra">Chakra</option>
-                        <option value="font-niramit">Niramit</option>
                     </select>
-                    <select v-model="activeScene.textStyle" class="border rounded px-2 py-1.5 bg-gray-50">
+                    <select v-model="activeScene.textStyle" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50">
                         <option value="none">ไม่มีกรอบ</option>
                         <option value="white-card">การ์ดขาว</option>
                         <option value="black-glass">กระจกดำ</option>
-                        <option value="paper">กระดาษ</option>
+                        <option value="paper">กระดาษเก่า</option>
                         <option value="comic">การ์ตูน</option>
                     </select>
-                    <input type="number" v-model="activeScene.fontSize" class="border rounded w-16 px-2 py-1.5 bg-gray-50 text-center">
-                    <input type="color" v-model="activeScene.textColor" class="w-8 h-8 rounded cursor-pointer">
+                    <div class="flex items-center gap-1 border rounded px-1 bg-gray-50">
+                        <i class="ph ph-text-aa text-gray-400 ml-1"></i>
+                        <input type="number" v-model="activeScene.fontSize" @input="saveToLocal" class="w-12 px-1 py-1 bg-transparent text-center focus:outline-none">
+                    </div>
+                    <input type="color" v-model="activeScene.textColor" @input="saveToLocal" class="w-8 h-8 rounded-md cursor-pointer border">
                 </div>
 
                 <div class="flex items-center gap-2">
-                     <span class="text-gray-500 font-semibold">จัดวาง:</span>
-                     <select v-model="activeScene.textPosition" class="border rounded px-2 py-1.5 bg-gray-50">
+                     <span class="text-gray-400 font-bold uppercase text-[10px]">ตำแหน่ง</span>
+                     <select v-model="activeScene.textPosition" @change="saveToLocal" class="border rounded px-2 py-1.5 bg-gray-50">
                         <option value="bottom">ล่าง</option>
                         <option value="top">บน</option>
                         <option value="center">กลาง</option>
@@ -210,34 +227,37 @@
                 </div>
 
                 <div class="flex items-center gap-2 ml-auto">
-                    <span class="text-gray-500 font-semibold">พื้นหลัง:</span>
-                    <input type="color" v-model="activeScene.bgColor" class="w-8 h-8 rounded cursor-pointer">
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">พื้นหลัง</span>
+                    <input type="color" v-model="activeScene.bgColor" @input="saveToLocal" class="w-8 h-8 rounded-md cursor-pointer border">
                 </div>
             </div>
 
             <!-- Canvas Area -->
-            <div class="flex-1 bg-zinc-600 overflow-auto flex justify-center py-8 px-4">
+            <div class="flex-1 overflow-auto flex justify-center py-12 px-4 scroll-smooth">
                 <div 
                     class="a4-page shadow-2xl transition-all duration-300"
                     :style="{ transform: 'scale(' + zoomLevel + ')', backgroundColor: activeScene.bgColor }"
                 >
+                    <!-- Background Image -->
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <img v-if="activeScene.image" :src="activeScene.image" class="w-full h-full" :style="{ objectFit: activeScene.fit }">
                     </div>
 
+                    <!-- Content Overlay -->
                     <div 
-                        class="absolute inset-0 pointer-events-none p-8 flex flex-col items-center"
+                        class="absolute inset-0 pointer-events-none p-12 flex flex-col items-center"
                         :style="{
                             justifyContent: activeScene.textPosition === 'top' ? 'flex-start' : (activeScene.textPosition === 'bottom' ? 'flex-end' : 'center')
                         }"
                     >
                         <div 
-                            class="pointer-events-auto w-full transition-all"
+                            class="pointer-events-auto w-full transition-all duration-300"
                             :class="['style-' + activeScene.textStyle, activeScene.fontFamily]"
                         >
                             <textarea 
                                 v-model="activeScene.text"
-                                placeholder="พิมพ์ข้อความที่นี่..."
+                                @input="saveToLocal"
+                                placeholder="เริ่มเขียนเรื่องราวที่นี่..."
                                 class="w-full bg-transparent resize-none focus:outline-none rounded text-center leading-relaxed block overflow-hidden"
                                 :style="{ fontSize: activeScene.fontSize + 'px', color: activeScene.textColor }"
                                 oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
@@ -248,42 +268,64 @@
             </div>
 
             <!-- Zoom Controls -->
-            <div class="absolute bottom-6 right-6 flex gap-2 bg-white rounded-full shadow-lg p-1.5 border z-30">
-                <button @click="zoomOut" class="p-2 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"><i class="ph ph-minus"></i></button>
-                <span class="flex items-center text-xs font-mono w-12 justify-center">{{ Math.round(zoomLevel * 100) }}%</span>
-                <button @click="zoomIn" class="p-2 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"><i class="ph ph-plus"></i></button>
+            <div class="absolute bottom-6 right-6 flex gap-2 bg-white/90 backdrop-blur rounded-full shadow-xl p-2 border border-white/20 z-30">
+                <button @click="zoomOut" class="p-2 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center"><i class="ph ph-minus font-bold"></i></button>
+                <span class="flex items-center text-sm font-bold w-14 justify-center text-indigo-600">{{ Math.round(zoomLevel * 100) }}%</span>
+                <button @click="zoomIn" class="p-2 hover:bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center"><i class="ph ph-plus font-bold"></i></button>
             </div>
         </main>
     </div>
 
-    <!-- Hidden Export Container (Optimized for PDF) -->
-    <!-- We generate this dynamically in JS during export to ensure latest state -->
-    <div id="pdf-export-root" style="display: none;"></div>
+    <!-- Container สำหรับ Export PDF (Render แยกเพื่อความแม่นยำ) -->
+    <div id="pdf-export-root" style="position: fixed; left: -10000px; top: 0; width: 210mm; background: white;">
+        <div v-for="scene in scenes" :key="'pdf-' + scene.id" class="pdf-page" :style="{ backgroundColor: scene.bgColor }">
+            <div style="position: absolute; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                 <img v-if="scene.image" :src="scene.image" style="width: 100%; height: 100%;" :style="{ objectFit: scene.fit }">
+            </div>
+            <div style="position: absolute; inset: 0; padding: 60px; display: flex; flex-direction: column; align-items: center;"
+                 :style="{ justifyContent: scene.textPosition === 'top' ? 'flex-start' : (scene.textPosition === 'bottom' ? 'flex-end' : 'center') }">
+                <div :class="['style-' + scene.textStyle, scene.fontFamily, 'pdf-text-content']"
+                     style="text-align: center; width: 100%; min-height: 1em;"
+                     :style="{ fontSize: scene.fontSize + 'px', color: scene.textColor }">
+                    {{ scene.text || '' }}
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         function store() {
             return {
                 scenes: [],
                 activeSceneIndex: 0,
-                zoomLevel: 0.6,
+                zoomLevel: 0.5,
                 isExporting: false,
                 draggedIndex: null,
                 dragEnter: null,
+                lastSaved: '',
 
                 get activeScene() {
                     return this.scenes[this.activeSceneIndex] || {};
                 },
 
                 mounted() {
-                    this.addScene();
-                    window.addEventListener('resize', () => {
-                        this.zoomLevel = window.innerWidth < 1024 ? 0.4 : 0.6;
-                    });
+                    this.loadFromLocal();
+                    this.updateZoom();
+                    window.addEventListener('resize', () => this.updateZoom());
+                    
+                    // Auto-save ทุกๆ 30 วินาทีเผื่อไว้
+                    setInterval(() => this.saveToLocal(), 30000);
+                },
+
+                updateZoom() {
+                    if (window.innerWidth < 1024) this.zoomLevel = 0.35;
+                    else if (window.innerWidth < 1440) this.zoomLevel = 0.5;
+                    else this.zoomLevel = 0.6;
                 },
 
                 createScene(image = null) {
                     return {
-                        id: Math.random().toString(36).substr(2, 9),
+                        id: 's-' + Math.random().toString(36).substr(2, 9),
                         image: image,
                         text: "",
                         fit: 'cover',
@@ -292,33 +334,33 @@
                         bgColor: '#ffffff',
                         textStyle: 'none', 
                         fontFamily: 'font-sarabun',
-                        textPosition: 'bottom', 
-                        textWidth: 90
+                        textPosition: 'bottom'
                     };
                 },
 
                 addScene() {
                     this.scenes.push(this.createScene());
                     this.activeSceneIndex = this.scenes.length - 1;
+                    this.saveToLocal();
                 },
 
                 handleBulkUpload(event) {
                     const files = Array.from(event.target.files);
                     if (!files.length) return;
 
-                    let isFirstUsed = false;
-                    if (this.scenes.length === 1 && !this.activeScene.image && !this.activeScene.text) {
-                        isFirstUsed = true;
-                    }
+                    let isFirstSceneEmpty = (this.scenes.length === 1 && !this.activeScene.image && !this.activeScene.text);
+                    let processed = 0;
 
                     files.forEach((file, idx) => {
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            if (idx === 0 && isFirstUsed) {
+                            if (idx === 0 && isFirstSceneEmpty) {
                                 this.scenes[0].image = e.target.result;
                             } else {
                                 this.scenes.push(this.createScene(e.target.result));
                             }
+                            processed++;
+                            if (processed === files.length) this.saveToLocal();
                         };
                         reader.readAsDataURL(file);
                     });
@@ -329,16 +371,24 @@
                     const file = event.target.files[0];
                     if (file) {
                         const reader = new FileReader();
-                        reader.onload = (e) => { this.activeScene.image = e.target.result; };
+                        reader.onload = (e) => { 
+                            this.activeScene.image = e.target.result; 
+                            this.saveToLocal();
+                        };
                         reader.readAsDataURL(file);
                     }
                 },
 
                 deleteScene(index) {
-                    if (this.scenes.length > 1 && confirm('ลบหน้านี้?')) {
+                    if (this.scenes.length > 1) {
                         this.scenes.splice(index, 1);
-                        this.activeSceneIndex = Math.min(this.activeSceneIndex, this.scenes.length - 1);
+                        if (this.activeSceneIndex >= this.scenes.length) {
+                            this.activeSceneIndex = this.scenes.length - 1;
+                        }
+                    } else {
+                        this.scenes[0] = this.createScene();
                     }
+                    this.saveToLocal();
                 },
 
                 dragStart(index, event) {
@@ -351,93 +401,87 @@
                         const item = this.scenes.splice(this.draggedIndex, 1)[0];
                         this.scenes.splice(index, 0, item);
                         this.activeSceneIndex = index;
+                        this.saveToLocal();
                     }
                     this.draggedIndex = null;
                     this.dragEnter = null;
                 },
 
-                zoomIn() { if(this.zoomLevel < 1.2) this.zoomLevel += 0.1; },
-                zoomOut() { if(this.zoomLevel > 0.3) this.zoomLevel -= 0.1; },
+                zoomIn() { if(this.zoomLevel < 1.3) this.zoomLevel += 0.05; },
+                zoomOut() { if(this.zoomLevel > 0.15) this.zoomLevel -= 0.05; },
+
+                saveToLocal() {
+                    try {
+                        localStorage.setItem('storybook_data', JSON.stringify(this.scenes));
+                        const now = new Date();
+                        this.lastSaved = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                    } catch(e) {
+                        console.warn("Local Storage Full or Error", e);
+                    }
+                },
+
+                loadFromLocal() {
+                    const data = localStorage.getItem('storybook_data');
+                    if (data) {
+                        try {
+                            this.scenes = JSON.parse(data);
+                            if (this.scenes.length === 0) this.addScene();
+                        } catch(e) {
+                            this.addScene();
+                        }
+                    } else {
+                        this.addScene();
+                    }
+                },
+
+                clearAll() {
+                    if(confirm('คุณต้องการล้างข้อมูลทั้งหมดใช่หรือไม่?')) {
+                        localStorage.removeItem('storybook_data');
+                        this.scenes = [this.createScene()];
+                        this.activeSceneIndex = 0;
+                        this.lastSaved = '';
+                    }
+                },
 
                 async exportPDF() {
                     if (this.isExporting) return;
                     this.isExporting = true;
-                    
-                    const container = document.getElementById('pdf-export-root');
-                    container.innerHTML = '';
-                    container.style.display = 'block';
-                    container.style.position = 'absolute';
-                    container.style.left = '-9999px';
-
-                    // Manually build PDF HTML to ensure all images and text are captured correctly
-                    this.scenes.forEach((scene) => {
-                        const page = document.createElement('div');
-                        page.className = 'pdf-page';
-                        page.style.backgroundColor = scene.bgColor;
-
-                        // Image
-                        if (scene.image) {
-                            const imgContainer = document.createElement('div');
-                            imgContainer.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center;';
-                            const img = document.createElement('img');
-                            img.src = scene.image;
-                            img.style.width = '100%';
-                            img.style.height = '100%';
-                            img.style.objectFit = scene.fit;
-                            imgContainer.appendChild(img);
-                            page.appendChild(imgContainer);
-                        }
-
-                        // Text
-                        if (scene.text.trim()) {
-                            const textLayer = document.createElement('div');
-                            const align = scene.textPosition === 'top' ? 'flex-start' : (scene.textPosition === 'bottom' ? 'flex-end' : 'center');
-                            textLayer.style.cssText = `position:absolute; inset:0; padding:40px; display:flex; flex-direction:column; align-items:center; z-index:10; justify-content:${align}; pointer-events:none;`;
-                            
-                            const textBox = document.createElement('div');
-                            textBox.className = `style-${scene.textStyle} ${scene.fontFamily}`;
-                            textBox.style.cssText = `text-align:center; width:100%; white-space:pre-wrap; line-height:1.5; word-wrap:break-word; font-size:${scene.fontSize}px; color:${scene.textColor};`;
-                            textBox.textContent = scene.text;
-                            
-                            textLayer.appendChild(textBox);
-                            page.appendChild(textLayer);
-                        }
-                        
-                        container.appendChild(page);
-                    });
-
-                    // Wait for all images in the container to load
-                    const images = container.querySelectorAll('img');
-                    const imagePromises = Array.from(images).map(img => {
-                        if (img.complete) return Promise.resolve();
-                        return new Promise(resolve => {
-                            img.onload = resolve;
-                            img.onerror = resolve;
-                        });
-                    });
-
-                    await Promise.all(imagePromises);
-
-                    const opt = {
-                        margin: 0,
-                        filename: 'storybook-' + Date.now() + '.pdf',
-                        image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { 
-                            scale: 2, 
-                            useCORS: true, 
-                            letterRendering: true,
-                            allowTaint: true
-                        },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                    };
+                    this.saveToLocal(); // บันทึกล่าสุดก่อน export
 
                     try {
-                        await html2pdf().set(opt).from(container).save();
+                        // หน่วงเวลาเพื่อให้ Petite-vue render หน้า PDF ครบถ้วน
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        const element = document.getElementById('pdf-export-root');
+                        
+                        // ตรวจสอบรูปภาพให้พร้อม
+                        const imgs = element.querySelectorAll('img');
+                        const imgPromises = Array.from(imgs).map(img => {
+                            if (img.complete) return Promise.resolve();
+                            return new Promise(res => { img.onload = res; img.onerror = res; });
+                        });
+                        await Promise.all(imgPromises);
+
+                        const opt = {
+                            margin: 0,
+                            filename: `storybook-${Date.now()}.pdf`,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { 
+                                scale: 2, 
+                                useCORS: true, 
+                                logging: false,
+                                letterRendering: true,
+                                scrollX: 0,
+                                scrollY: 0
+                            },
+                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                            pagebreak: { mode: 'css', after: '.pdf-page' }
+                        };
+
+                        await html2pdf().set(opt).from(element).save();
                     } catch (err) {
-                        console.error('PDF Export Error:', err);
+                        console.error("PDF Error:", err);
                     } finally {
-                        container.innerHTML = '';
-                        container.style.display = 'none';
                         this.isExporting = false;
                     }
                 }
