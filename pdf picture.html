@@ -1,9 +1,9 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Storybook Creator - สร้างนิทานภาพและ PDF / PNG</title>
+<title>Storybook Creator - PDF / PNG</title>
 
 <!-- Libraries -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -15,18 +15,20 @@
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600&family=Chakra+Petch:wght@400;600&family=Mali:wght@400;600&family=Niramit:wght@400;600&family=Prompt:wght@300;400;600&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&family=Mali:wght@400;600&family=Prompt:wght@300;400;600&family=Anuphan:wght@300;400;600&display=swap" rel="stylesheet">
 
 <style>
 body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
 .font-sarabun{font-family:'Sarabun'}
-.font-anuphan{font-family:'Anuphan'}
 .font-mali{font-family:'Mali'}
 .font-prompt{font-family:'Prompt'}
-.font-chakra{font-family:'Chakra Petch'}
-.font-niramit{font-family:'Niramit'}
+.font-anuphan{font-family:'Anuphan'}
 
-.a4-page{width:210mm;height:297mm;background:#fff;position:relative;overflow:hidden}
+.a4-page{
+    width:210mm;height:297mm;
+    background:#fff;position:relative;overflow:hidden
+}
+
 .style-none{background:transparent}
 .style-white-card{background:rgba(255,255,255,.9);border-radius:12px;padding:1.5rem}
 .style-black-glass{background:rgba(0,0,0,.6);color:#fff;border-radius:12px;padding:1.5rem}
@@ -34,17 +36,13 @@ body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
 .style-comic{background:#fff;border:3px solid #000;border-radius:16px;padding:1.5rem}
 
 .pdf-page{
-    width:210mm;
-    height:296.8mm;
+    width:210mm;height:296.8mm;
     page-break-after:always;
-    position:relative;
-    overflow:hidden;
-    background:#fff;
+    position:relative;overflow:hidden;background:#fff
 }
-.pdf-text-content{
-    word-break:break-word;
-    white-space:normal;
-    line-height:1.5;
+.pdf-text{
+    width:100%;text-align:center;
+    word-break:break-word;line-height:1.5
 }
 </style>
 </head>
@@ -52,20 +50,29 @@ body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
 <body v-scope="store()" @mounted="mounted">
 
 <!-- ================= NAVBAR ================= -->
-<nav class="bg-white shadow-sm border-b px-4 py-3 flex justify-between items-center sticky top-0 z-50">
+<nav class="bg-white shadow px-4 py-3 flex justify-between items-center sticky top-0 z-50">
     <div class="flex items-center gap-2">
         <i class="ph ph-book-open-text text-2xl text-indigo-600"></i>
-        <span class="font-bold">Storybook Creator</span>
+        <b>Storybook Creator</b>
     </div>
     <div class="flex gap-2">
-        <button @click="addScene" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded">เพิ่มหน้า</button>
-        <button @click="exportPDF" :disabled="isExporting"
-            class="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50">
-            Export PDF
+        <button @click="addScene" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded">
+            เพิ่มหน้า
         </button>
+
+        <label class="px-4 py-2 bg-green-100 text-green-700 rounded cursor-pointer">
+            อัปโหลดรูป
+            <input type="file" accept="image/*" multiple hidden @change="uploadImages">
+        </label>
+
+        <button @click="exportPDF" :disabled="isExporting"
+            class="px-4 py-2 bg-red-600 text-white rounded">
+            PDF
+        </button>
+
         <button @click="exportPNG" :disabled="isExporting"
-            class="px-4 py-2 bg-emerald-600 text-white rounded disabled:opacity-50">
-            Export PNG
+            class="px-4 py-2 bg-emerald-600 text-white rounded">
+            PNG
         </button>
     </div>
 </nav>
@@ -80,10 +87,11 @@ body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
             class="absolute inset-0 w-full h-full"
             :style="{objectFit:activeScene.fit}">
 
-        <div class="absolute inset-0 flex p-12"
+        <div class="absolute inset-0 p-12 flex"
             :style="{justifyContent:
                 activeScene.textPosition==='top'?'flex-start':
                 activeScene.textPosition==='bottom'?'flex-end':'center'}">
+
             <textarea v-model="activeScene.text"
                 class="w-full bg-transparent resize-none outline-none text-center"
                 :class="[activeScene.fontFamily,'style-'+activeScene.textStyle]"
@@ -93,11 +101,12 @@ body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
     </div>
 </div>
 
-<!-- ================= PDF / PNG RENDER ROOT ================= -->
-<div id="pdf-export-root" style="position:fixed;left:-10000px;top:0;width:210mm">
-    <div v-for="scene in scenes" :key="'pdf-'+scene.id"
+<!-- ================= PDF / PNG ROOT ================= -->
+<div id="pdf-export-root"
+     style="position:fixed;left:-10000px;top:0;width:210mm;background:white">
+    <div v-for="scene in scenes" :key="scene.id"
         class="pdf-page" :style="{backgroundColor:scene.bgColor}">
-        
+
         <img v-if="scene.image"
             :src="scene.image"
             style="width:100%;height:100%;object-fit:cover">
@@ -107,8 +116,9 @@ body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
                 scene.textPosition==='top'?'flex-start':
                 scene.textPosition==='bottom'?'flex-end':'center'}">
 
-            <div :class="['style-'+scene.textStyle,scene.fontFamily,'pdf-text-content']"
-                :style="{fontSize:scene.fontSize+'px',color:scene.textColor,textAlign:'center',width:'100%'}"
+            <div class="pdf-text"
+                :class="['style-'+scene.textStyle,scene.fontFamily]"
+                :style="{fontSize:scene.fontSize+'px',color:scene.textColor}"
                 v-html="formatText(scene.text)">
             </div>
         </div>
@@ -150,6 +160,19 @@ return{
         this.save();
     },
 
+    uploadImages(e){
+        const files=[...e.target.files];
+        files.forEach(f=>{
+            const r=new FileReader();
+            r.onload=ev=>{
+                this.scenes.push(this.newScene(ev.target.result));
+                this.save();
+            };
+            r.readAsDataURL(f);
+        });
+        e.target.value='';
+    },
+
     save(){
         localStorage.setItem('storybook_data',JSON.stringify(this.scenes));
     },
@@ -176,22 +199,40 @@ return{
     },
 
     async exportPNG(){
+        if(this.isExporting) return;
         this.isExporting=true;
-        await new Promise(r=>setTimeout(r,800));
-        const pages=document.querySelectorAll('#pdf-export-root .pdf-page');
-        for(let i=0;i<pages.length;i++){
-            const canvas=await html2canvas(pages[i],{
-                scale:3,
-                useCORS:true,
-                backgroundColor:'#fff'
-            });
-            const a=document.createElement('a');
-            a.download=`storybook-page-${String(i+1).padStart(2,'0')}.png`;
-            a.href=canvas.toDataURL('image/png');
-            a.click();
-            await new Promise(r=>setTimeout(r,300));
+
+        const root=document.getElementById('pdf-export-root');
+        const oldStyle=root.getAttribute('style');
+
+        try{
+            // 🔥 ย้ายเข้าหน้าจอ (แก้หน้าขาว)
+            root.setAttribute(
+                'style',
+                'position:relative;left:0;top:0;width:210mm;background:white;z-index:9999'
+            );
+
+            await new Promise(r=>setTimeout(r,500));
+
+            const pages=root.querySelectorAll('.pdf-page');
+
+            for(let i=0;i<pages.length;i++){
+                const canvas=await html2canvas(pages[i],{
+                    scale:3,
+                    useCORS:true,
+                    backgroundColor:'#ffffff'
+                });
+                const a=document.createElement('a');
+                a.download=`storybook-page-${String(i+1).padStart(2,'0')}.png`;
+                a.href=canvas.toDataURL('image/png');
+                a.click();
+                await new Promise(r=>setTimeout(r,300));
+            }
+        }finally{
+            // 🔵 ย้ายกลับไปซ่อน
+            root.setAttribute('style',oldStyle);
+            this.isExporting=false;
         }
-        this.isExporting=false;
     }
 }}
 </script>
