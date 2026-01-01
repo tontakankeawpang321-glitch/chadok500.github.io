@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customizable Storybook (Styles & Scenes)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400&family=Charm:wght@400;700&family=Maitree:wght@400;600&display=swap');
+        
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: #1a1a1a;
+            color: #e5e5e5;
+            min-height: 100vh;
+        }
+
+        .storybook-title { font-family: 'Charm', cursive; }
+
+        .mobile-container {
+            max-width: 480px; 
+            margin: 0 auto;
+            background-color: #000;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .scene-card {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 3/4; 
+            background: #2a2a2a;
+            overflow: hidden;
+            border-bottom: 1px solid #333;
+        }
+
+        .scene-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.5s ease;
+        }
+
+        .text-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.95) 15%, rgba(0,0,0,0.7) 60%, transparent 100%);
+            padding: 80px 25px 40px 25px;
+            pointer-events: none;
+        }
+
+        .story-text {
+            font-family: 'Maitree', serif; 
+            color: #fff;
+            text-shadow: 1px 1px 4px rgba(0,0,0,1);
+            font-size: 1.5rem; 
+            line-height: 1.6;
+            font-weight: 500;
+        }
+
+        .scene-number {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            backdrop-filter: blur(4px);
+        }
+
+        .loader-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #2a2a2a;
+            z-index: 10;
+        }
+
+        .loader {
+            border: 3px solid #333;
+            border-top: 3px solid #fbbf24;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .controls-layer {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-bottom: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-container">
+        
+        <!-- Sticky Header / Controls -->
+        <div class="controls-layer" id="controlsLayer">
+            <h1 class="storybook-title text-3xl font-bold text-amber-400 text-center mb-4">นิทานก่อนนอน</h1>
+            
+            <div id="inputSection">
+                <textarea 
+                    id="prompt" 
+                    rows="2" 
+                    class="w-full p-3 bg-gray-800 border border-gray-700 rounded-xl text-white outline-none focus:border-amber-500 text-sm mb-3"
+                    placeholder="เล่าเรื่องเกี่ยวกับ... (เช่น ลูกหมีหลงป่า)"></textarea>
+                
+                <!-- ตัวเลือกสไตล์ภาพ -->
+                <div class="flex items-center gap-2 mb-3">
+                    <label class="text-gray-400 text-sm whitespace-nowrap min-w-[60px]">สไตล์ภาพ:</label>
+                    <select id="styleSelect" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg text-amber-400 outline-none focus:border-amber-500 text-sm">
+                        <option value="Children's storybook illustration, watercolor style, soft pastel colors, dreamy atmosphere">นิทานสีน้ำ (Storybook Watercolor)</option>
+                        <option value="Graphic Novel style, dramatic lighting, bold ink lines, cinematic composition">กราฟิกโนเวล (Graphic Novel)</option>
+                        <option value="Flat 2D Vector Illustration, clean lines, vibrant solid colors, minimal shading">การ์ตูน 2D (Flat Vector)</option>
+                        <option value="Manga style, black and white ink with screentones, dynamic action lines, Japanese comic style">มังงะญี่ปุ่น (Manga B&W)</option>
+                        <option value="Anime style, Studio Ghibli inspired, lush green backgrounds, highly detailed, atmospheric lighting">อนิเมะ/จิบลิ (Ghibli Style)</option>
+                        <option value="Western American Comic Book style, bold black outlines, halftone patterns, vibrant superhero colors">คอมมิคตะวันตก (Western Comics)</option>
+                        <option value="High Fantasy Art, oil painting style, magical atmosphere, intricate details, epic scale">แฟนตาซี (Epic Fantasy)</option>
+                        <option value="Cyberpunk style, neon lights, futuristic city, high tech, blue and pink color palette">ไซเบอร์พังค์ (Cyberpunk)</option>
+                        <option value="Dark Fantasy, Horror style, gritty texture, low key lighting, deep shadows, mysterious">แนวดาร์ก/ลึกลับ (Dark/Horror)</option>
+                        <option value="Minimalist Art, simple geometric shapes, plenty of negative space, abstract, clean">มินิมอล (Minimalist)</option>
+                        <option value="Classic Oil Painting on Canvas, textured brushstrokes, fine art museum style">สีน้ำมัน (Classic Oil)</option>
+                    </select>
+                </div>
+
+                <!-- ตัวเลือกจำนวนฉาก -->
+                <div class="flex items-center gap-2 mb-3">
+                    <label class="text-gray-400 text-sm whitespace-nowrap min-w-[60px]">ความยาว:</label>
+                    <select id="sceneCount" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg text-amber-400 outline-none focus:border-amber-500 text-sm">
+                        <option value="5">5 ฉาก (เรื่องสั้น)</option>
+                        <option value="10">10 ฉาก (เรื่องยาวปานกลาง)</option>
+                        <option value="12">12 ฉาก (มาตรฐาน)</option>
+                        <option value="15">15 ฉาก (ยาวพิเศษ)</option>
+                        <option value="20">20 ฉาก (มหากาพย์)</option>
+                        <option value="24" selected>24 ฉาก (เต็มรูปแบบ)</option>
+                    </select>
+                </div>
+
+                <button 
+                    id="generateBtn"
+                    onclick="startStory()"
+                    class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all text-sm">
+                    เริ่มเล่าเรื่อง
+                </button>
+            </div>
+
+            <!-- Status Bar -->
+            <div id="statusSection" class="hidden mt-2">
+                <div class="flex justify-between items-center text-xs text-amber-200 mb-1">
+                    <span id="statusText">กำลังเตรียมข้อมูล...</span>
+                    <span id="progressText">0/0</span>
+                </div>
+                <div class="h-1 bg-gray-700 rounded-full overflow-hidden mb-2">
+                    <div id="progressFill" class="h-full bg-amber-500 w-0 transition-all duration-300"></div>
+                </div>
+                
+                <!-- ปุ่ม Download All -->
+                <button 
+                    id="downloadAllBtn"
+                    onclick="downloadAllImages()"
+                    class="hidden w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg shadow-md transition-all text-sm flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    ดาวน์โหลดเรื่องราวทั้งหมด (.zip)
+                </button>
+            </div>
+            
+            <div id="errorBox" class="mt-2 p-2 bg-red-900/50 text-red-200 text-xs rounded hidden"></div>
+        </div>
+
+        <!-- Story Feed -->
+        <div id="storyFeed" class="pb-20">
+            <div id="placeholder" class="flex flex-col items-center justify-center h-64 text-gray-500 text-sm p-8 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <p>เลือกสไตล์ภาพ จำนวนฉาก และหัวข้อ เพื่อเริ่มสร้างนิทาน</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const apiKey = ""; 
+        const IMAGE_MODEL = "imagen-4.0-generate-001";
+        const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
+        
+        let generatedScenesData = [];
+        let currentStoryText = ""; 
+        
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        async function apiRequest(url, payload, retries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) return await response.json();
+                    if (response.status === 429) { await sleep(delay); delay *= 2; continue; }
+                    const err = await response.json();
+                    throw new Error(err.error?.message || "API Error");
+                } catch (e) {
+                    if (i === retries - 1) throw e;
+                    await sleep(delay); delay *= 2;
+                }
+            }
+        }
+
+        async function startStory() {
+            const promptText = document.getElementById('prompt').value.trim();
+            const sceneCount = document.getElementById('sceneCount').value; 
+            const selectedStyle = document.getElementById('styleSelect').value; 
+            
+            const feed = document.getElementById('storyFeed');
+            const inputSection = document.getElementById('inputSection');
+            const statusSection = document.getElementById('statusSection');
+            const statusText = document.getElementById('statusText');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const errorBox = document.getElementById('errorBox');
+            const downloadBtn = document.getElementById('downloadAllBtn');
+
+            if (!promptText) return;
+
+            // Reset UI
+            feed.innerHTML = "";
+            generatedScenesData = [];
+            currentStoryText = "";
+            inputSection.classList.add('hidden'); 
+            statusSection.classList.remove('hidden');
+            downloadBtn.classList.add('hidden');
+            errorBox.classList.add('hidden');
+
+            try {
+                // 1. Generate Text (Dynamic Scene Count)
+                statusText.textContent = `กำลังแต่งเรื่องราว ${sceneCount} ฉาก...`;
+                const textUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`;
+                
+                // FIX: สั่งห้ามไม่ให้ Gemini ระบุ Style ใน image_prompt เพื่อไม่ให้ตีกันกับสไตล์ที่ user เลือก
+                const textPayload = {
+                    contents: [{ parts: [{ text: `แต่งนิทานยาว ${sceneCount} ฉาก (Scene) เกี่ยวกับ: "${promptText}".
+                    ตอบกลับเป็น JSON Structure เท่านั้น:
+                    {
+                      "title": "ชื่อเรื่อง",
+                      "scenes": [
+                        { "text": "เนื้อเรื่องสั้นๆ สำหรับฉากนี้ (ภาษาไทย 2-3 บรรทัด)", "image_prompt": "English visual description of OBJECTS, ACTIONS, and SETTING only. DO NOT include art style keywords like 'watercolor' or 'cartoon'." }
+                      ]
+                    }
+                    ต้องมีครบ ${sceneCount} ฉาก. เนื้อเรื่องต้องต่อเนื่องกัน.` }] }],
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                const textData = await apiRequest(textUrl, textPayload);
+                const storyData = JSON.parse(textData.candidates[0].content.parts[0].text);
+                
+                document.querySelector('h1').textContent = storyData.title;
+
+                currentStoryText += `เรื่อง: ${storyData.title}\n`;
+                currentStoryText += `สไตล์ภาพ: ${document.getElementById('styleSelect').options[document.getElementById('styleSelect').selectedIndex].text}\n\n`;
+                storyData.scenes.forEach((s, idx) => {
+                    currentStoryText += `ฉากที่ ${idx + 1}\n------------------\n${s.text}\n\n`;
+                });
+
+                // 2. Loop Generate Images
+                const totalScenes = storyData.scenes.length;
+                
+                for (let i = 0; i < totalScenes; i++) {
+                    // --- BATCH LOGIC: พัก 30 วินาที ทุกๆ 3 รูป ---
+                    if (i > 0 && i % 3 === 0) {
+                        let cooldown = 30;
+                        while (cooldown > 0) {
+                            statusText.textContent = `⏳ พักเครื่องระบายความร้อน... ${cooldown} วินาที`;
+                            statusText.className = "text-yellow-400 animate-pulse text-xs";
+                            await sleep(1000);
+                            cooldown--;
+                        }
+                        statusText.className = "text-amber-200 text-xs"; 
+                    }
+                    // ---------------------------------------------
+
+                    const scene = storyData.scenes[i];
+                    const sceneIdx = i + 1;
+                    
+                    const sceneId = `scene-${sceneIdx}`;
+                    const div = document.createElement('div');
+                    div.className = 'scene-card';
+                    div.innerHTML = `
+                        <div class="loader-overlay" id="loader-${sceneId}">
+                            <div class="loader mb-2"></div>
+                            <span class="text-xs text-gray-400">กำลังวาดฉากที่ ${sceneIdx}...</span>
+                        </div>
+                        <img id="img-${sceneId}" class="scene-image opacity-0" alt="Scene ${sceneIdx}">
+                        <div class="text-overlay">
+                            <p class="story-text">${scene.text}</p>
+                        </div>
+                        <div class="scene-number">${sceneIdx}/${totalScenes}</div>
+                    `;
+                    feed.appendChild(div);
+
+                    statusText.textContent = `กำลังวาดฉากที่ ${sceneIdx}...`;
+                    progressText.textContent = `${sceneIdx}/${totalScenes}`;
+                    progressFill.style.width = `${(sceneIdx / totalScenes) * 100}%`;
+
+                    try {
+                        const imageUrl = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:predict?key=${apiKey}`;
+                        
+                        // FIX: บังคับ Style ที่เลือกไว้หน้าสุด เพื่อให้มีน้ำหนักสูงสุด
+                        const finalPrompt = `Art Style: ${selectedStyle}. Scene Description: ${scene.image_prompt}. Vertical aspect ratio, highly detailed, masterpiece`;
+                        
+                        const imagePayload = {
+                            instances: [{ prompt: finalPrompt }],
+                            parameters: { 
+                                sampleCount: 1,
+                                aspectRatio: "3:4"
+                            }
+                        };
+                        const imageData = await apiRequest(imageUrl, imagePayload);
+                        
+                        if (imageData.predictions?.[0]) {
+                            const base64Str = imageData.predictions[0].bytesBase64Encoded;
+                            
+                            generatedScenesData.push({
+                                name: `scene-${String(sceneIdx).padStart(2, '0')}.png`,
+                                data: base64Str
+                            });
+                            
+                            if (generatedScenesData.length > 0) {
+                                downloadBtn.classList.remove('hidden');
+                            }
+
+                            const imgEl = document.getElementById(`img-${sceneId}`);
+                            const loaderEl = document.getElementById(`loader-${sceneId}`);
+                            
+                            imgEl.src = `data:image/png;base64,${base64Str}`;
+                            imgEl.onload = () => {
+                                imgEl.classList.remove('opacity-0');
+                                loaderEl.classList.add('hidden');
+                            };
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        const loaderEl = document.getElementById(`loader-${sceneId}`);
+                        loaderEl.innerHTML = `<span class="text-red-400 text-xs">ภาพเสียหาย</span>`;
+                    }
+
+                    await sleep(1000);
+                }
+
+                statusText.textContent = "สร้างนิทานเสร็จสมบูรณ์!";
+                progressFill.style.backgroundColor = "#10b981"; 
+
+            } catch (err) {
+                console.error(err);
+                errorBox.textContent = "เกิดข้อผิดพลาด: " + err.message;
+                errorBox.classList.remove('hidden');
+                inputSection.classList.remove('hidden');
+            }
+        }
+
+        function downloadAllImages() {
+            if (generatedScenesData.length === 0) return;
+
+            const btn = document.getElementById('downloadAllBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "กำลังบีบอัดไฟล์...";
+            btn.disabled = true;
+
+            const zip = new JSZip();
+            const folder = zip.folder("storybook-full");
+
+            generatedScenesData.forEach(img => {
+                folder.file(img.name, img.data, {base64: true});
+            });
+
+            if (currentStoryText) {
+                folder.file("story.txt", currentStoryText);
+            }
+
+            zip.generateAsync({type:"blob"})
+            .then(function(content) {
+                saveAs(content, "storybook-full.zip");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
