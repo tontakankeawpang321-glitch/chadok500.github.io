@@ -90,6 +90,7 @@
             position: relative;
             overflow: hidden;
             page-break-after: always;
+            background: white;
         }
     </style>
 </head>
@@ -256,26 +257,8 @@
     </div>
 
     <!-- Hidden Export Container (Optimized for PDF) -->
-    <div id="pdf-export-root" style="position: absolute; left: -9999px; top: 0; width: 210mm; background: white;">
-        <div v-for="scene in scenes" :key="scene.id" class="pdf-page" 
-             :style="{ backgroundColor: scene.bgColor }">
-            
-            <!-- Image Layer -->
-            <div style="position: absolute; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-                 <img v-if="scene.image" :src="scene.image" style="width: 100%; height: 100%;" :style="{ objectFit: scene.fit }">
-            </div>
-
-            <!-- Text Layer -->
-            <div style="position: absolute; inset: 0; padding: 40px; display: flex; flex-direction: column; align-items: center; z-index: 10;"
-                 :style="{ justifyContent: scene.textPosition === 'top' ? 'flex-start' : (scene.textPosition === 'bottom' ? 'flex-end' : 'center') }">
-                <div :class="['style-' + scene.textStyle, scene.fontFamily]"
-                     style="text-align: center; width: 100%; white-space: pre-wrap; line-height: 1.5; word-wrap: break-word;"
-                     :style="{ fontSize: scene.fontSize + 'px', color: scene.textColor }">
-                    {{ scene.text }}
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- We generate this dynamically in JS during export to ensure latest state -->
+    <div id="pdf-export-root" style="display: none;"></div>
 
     <script>
         function store() {
@@ -376,13 +359,65 @@
                 zoomIn() { if(this.zoomLevel < 1.2) this.zoomLevel += 0.1; },
                 zoomOut() { if(this.zoomLevel > 0.3) this.zoomLevel -= 0.1; },
 
-                exportPDF() {
+                async exportPDF() {
                     if (this.isExporting) return;
                     this.isExporting = true;
                     
-                    const element = document.getElementById('pdf-export-root');
-                    
-                    // ปรับแต่ง options เพื่อรองรับภาษาไทยและรูปภาพ Base64
+                    const container = document.getElementById('pdf-export-root');
+                    container.innerHTML = '';
+                    container.style.display = 'block';
+                    container.style.position = 'absolute';
+                    container.style.left = '-9999px';
+
+                    // Manually build PDF HTML to ensure all images and text are captured correctly
+                    this.scenes.forEach((scene) => {
+                        const page = document.createElement('div');
+                        page.className = 'pdf-page';
+                        page.style.backgroundColor = scene.bgColor;
+
+                        // Image
+                        if (scene.image) {
+                            const imgContainer = document.createElement('div');
+                            imgContainer.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center;';
+                            const img = document.createElement('img');
+                            img.src = scene.image;
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = scene.fit;
+                            imgContainer.appendChild(img);
+                            page.appendChild(imgContainer);
+                        }
+
+                        // Text
+                        if (scene.text.trim()) {
+                            const textLayer = document.createElement('div');
+                            const align = scene.textPosition === 'top' ? 'flex-start' : (scene.textPosition === 'bottom' ? 'flex-end' : 'center');
+                            textLayer.style.cssText = `position:absolute; inset:0; padding:40px; display:flex; flex-direction:column; align-items:center; z-index:10; justify-content:${align}; pointer-events:none;`;
+                            
+                            const textBox = document.createElement('div');
+                            textBox.className = `style-${scene.textStyle} ${scene.fontFamily}`;
+                            textBox.style.cssText = `text-align:center; width:100%; white-space:pre-wrap; line-height:1.5; word-wrap:break-word; font-size:${scene.fontSize}px; color:${scene.textColor};`;
+                            textBox.textContent = scene.text;
+                            
+                            textLayer.appendChild(textBox);
+                            page.appendChild(textLayer);
+                        }
+                        
+                        container.appendChild(page);
+                    });
+
+                    // Wait for all images in the container to load
+                    const images = container.querySelectorAll('img');
+                    const imagePromises = Array.from(images).map(img => {
+                        if (img.complete) return Promise.resolve();
+                        return new Promise(resolve => {
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                        });
+                    });
+
+                    await Promise.all(imagePromises);
+
                     const opt = {
                         margin: 0,
                         filename: 'storybook-' + Date.now() + '.pdf',
@@ -391,21 +426,20 @@
                             scale: 2, 
                             useCORS: true, 
                             letterRendering: true,
-                            allowTaint: true,
-                            logging: false
+                            allowTaint: true
                         },
                         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
                     };
 
-                    // เพิ่มการรอขนาดเล็กเพื่อให้มั่นใจว่า DOM ใน Hidden Container อัปเดตข้อมูลล่าสุดแล้ว
-                    setTimeout(() => {
-                        html2pdf().set(opt).from(element).save().then(() => {
-                            this.isExporting = false;
-                        }).catch(err => {
-                            console.error('PDF Export Error:', err);
-                            this.isExporting = false;
-                        });
-                    }, 1000);
+                    try {
+                        await html2pdf().set(opt).from(container).save();
+                    } catch (err) {
+                        console.error('PDF Export Error:', err);
+                    } finally {
+                        container.innerHTML = '';
+                        container.style.display = 'none';
+                        this.isExporting = false;
+                    }
                 }
             }
         }
