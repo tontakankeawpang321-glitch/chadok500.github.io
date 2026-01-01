@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Storybook Creator - PDF / PNG</title>
+<title>Storybook Creator - สร้างนิทานภาพและ PDF</title>
 
 <!-- Libraries -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -15,73 +15,111 @@
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&family=Mali:wght@400;600&family=Prompt:wght@300;400;600&family=Anuphan:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600&family=Chakra+Petch:wght@400;600&family=Mali:wght@400;600&family=Niramit:wght@400;600&family=Prompt:wght@300;400;600&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
 
 <style>
 body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
 .font-sarabun{font-family:'Sarabun'}
+.font-anuphan{font-family:'Anuphan'}
 .font-mali{font-family:'Mali'}
 .font-prompt{font-family:'Prompt'}
-.font-anuphan{font-family:'Anuphan'}
+.font-chakra{font-family:'Chakra Petch'}
+.font-niramit{font-family:'Niramit'}
 
 .a4-page{
     width:210mm;height:297mm;
-    background:#fff;position:relative;overflow:hidden
+    background:white;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 4px 6px -1px rgba(0,0,0,.1);
+    transform-origin:top center;
 }
 
 .style-none{background:transparent}
 .style-white-card{background:rgba(255,255,255,.9);border-radius:12px;padding:1.5rem}
-.style-black-glass{background:rgba(0,0,0,.6);color:#fff;border-radius:12px;padding:1.5rem}
-.style-paper{background:#fffbf0;border:2px solid #e5e0d0;padding:1.5rem}
-.style-comic{background:#fff;border:3px solid #000;border-radius:16px;padding:1.5rem}
+.style-black-glass{background:rgba(0,0,0,.6);color:white!important;border-radius:12px;padding:1.5rem}
+.style-paper{background:#fffbf0;border:2px solid #e5e0d0;border-radius:4px;padding:1.5rem}
+.style-comic{background:white;border:3px solid black;border-radius:16px;padding:1.5rem}
 
 .pdf-page{
-    width:210mm;height:296.8mm;
+    width:210mm;
+    height:296.8mm;
     page-break-after:always;
-    position:relative;overflow:hidden;background:#fff
+    position:relative;
+    overflow:hidden;
+    background:white;
 }
-.pdf-text{
-    width:100%;text-align:center;
-    word-break:break-word;line-height:1.5
+.pdf-text-content{
+    word-wrap:break-word;
+    overflow-wrap:break-word;
+    white-space:pre-wrap;
+    width:100%;
 }
 </style>
 </head>
 
 <body v-scope="store()" @mounted="mounted">
 
-<!-- ================= NAVBAR ================= -->
-<nav class="bg-white shadow px-4 py-3 flex justify-between items-center sticky top-0 z-50">
+<!-- Navbar -->
+<nav class="bg-white shadow-sm border-b px-4 py-3 flex justify-between items-center sticky top-0 z-50 h-16">
     <div class="flex items-center gap-2">
-        <i class="ph ph-book-open-text text-2xl text-indigo-600"></i>
-        <b>Storybook Creator</b>
+        <i class="ph ph-book-open-text text-3xl text-indigo-600"></i>
+        <h1 class="text-xl font-bold text-gray-800 font-mali">Storybook Creator</h1>
+        <span v-if="lastSaved" class="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded ml-2">
+            บันทึกแล้ว: {{ lastSaved }}
+        </span>
     </div>
-    <div class="flex gap-2">
-        <button @click="addScene" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded">
-            เพิ่มหน้า
+    <div class="flex gap-3">
+        <button @click="addScene"
+            class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-semibold text-sm">
+            <i class="ph ph-plus-circle"></i> เพิ่มหน้า
         </button>
 
-        <label class="px-4 py-2 bg-green-100 text-green-700 rounded cursor-pointer">
-            อัปโหลดรูป
-            <input type="file" accept="image/*" multiple hidden @change="uploadImages">
+        <label class="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 font-semibold text-sm cursor-pointer">
+            <i class="ph ph-images"></i> อัปโหลดรูป
+            <input type="file" accept="image/*" multiple hidden @change="handleBulkUpload">
         </label>
 
         <button @click="exportPDF" :disabled="isExporting"
-            class="px-4 py-2 bg-red-600 text-white rounded">
+            class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50">
             PDF
         </button>
 
+        <!-- ✅ เพิ่มปุ่ม PNG -->
         <button @click="exportPNG" :disabled="isExporting"
-            class="px-4 py-2 bg-emerald-600 text-white rounded">
+            class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold text-sm disabled:opacity-50">
             PNG
         </button>
     </div>
 </nav>
 
-<!-- ================= EDITOR ================= -->
-<div class="flex justify-center py-10">
-    <div class="a4-page shadow-xl"
-        :style="{backgroundColor:activeScene.bgColor}">
-        
+<!-- ===== Layout ===== -->
+<div class="flex h-[calc(100vh-64px)] overflow-hidden">
+
+<!-- Sidebar -->
+<aside class="w-64 bg-white border-r flex flex-col">
+    <div class="p-3 bg-gray-50 border-b text-sm font-semibold text-gray-500">
+        หน้านิทาน ({{ scenes.length }})
+    </div>
+    <div class="flex-1 overflow-y-auto p-2 space-y-2">
+        <div v-for="(scene,i) in scenes" :key="scene.id"
+            @click="activeSceneIndex=i"
+            class="p-2 border rounded cursor-pointer"
+            :class="activeSceneIndex===i?'border-indigo-500 bg-indigo-50':'border-gray-200'">
+            <div class="text-xs text-gray-400 mb-1">#{{ i+1 }}</div>
+            <div class="aspect-[210/297] bg-white border relative overflow-hidden">
+                <img v-if="scene.image" :src="scene.image"
+                    class="absolute inset-0 w-full h-full object-cover">
+            </div>
+        </div>
+    </div>
+</aside>
+
+<!-- Editor -->
+<main class="flex-1 bg-zinc-700 flex justify-center items-start py-12">
+    <div class="a4-page"
+        :style="{backgroundColor:activeScene.bgColor, transform:'scale('+zoomLevel+')'}">
+
         <img v-if="activeScene.image"
             :src="activeScene.image"
             class="absolute inset-0 w-full h-full"
@@ -92,23 +130,29 @@ body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
                 activeScene.textPosition==='top'?'flex-start':
                 activeScene.textPosition==='bottom'?'flex-end':'center'}">
 
-            <textarea v-model="activeScene.text"
-                class="w-full bg-transparent resize-none outline-none text-center"
-                :class="[activeScene.fontFamily,'style-'+activeScene.textStyle]"
-                :style="{fontSize:activeScene.fontSize+'px',color:activeScene.textColor}">
-            </textarea>
+            <div class="w-full"
+                :class="['style-'+activeScene.textStyle,activeScene.fontFamily]">
+
+                <textarea v-model="activeScene.text"
+                    class="w-full bg-transparent resize-none outline-none text-center"
+                    :style="{fontSize:activeScene.fontSize+'px',color:activeScene.textColor}"
+                    @input="saveToLocal">
+                </textarea>
+
+            </div>
         </div>
     </div>
+</main>
 </div>
 
-<!-- ================= PDF / PNG ROOT ================= -->
+<!-- ===== PDF / PNG ROOT ===== -->
 <div id="pdf-export-root"
-     style="position:fixed;left:-10000px;top:0;width:210mm;background:white">
-    <div v-for="scene in scenes" :key="scene.id"
+    style="position:fixed;left:-10000px;top:0;width:210mm;background:white">
+
+    <div v-for="scene in scenes" :key="'pdf-'+scene.id"
         class="pdf-page" :style="{backgroundColor:scene.bgColor}">
 
-        <img v-if="scene.image"
-            :src="scene.image"
+        <img v-if="scene.image" :src="scene.image"
             style="width:100%;height:100%;object-fit:cover">
 
         <div style="position:absolute;inset:0;padding:60px;display:flex"
@@ -116,10 +160,9 @@ body{font-family:'Sarabun',sans-serif;background:#f3f4f6}
                 scene.textPosition==='top'?'flex-start':
                 scene.textPosition==='bottom'?'flex-end':'center'}">
 
-            <div class="pdf-text"
-                :class="['style-'+scene.textStyle,scene.fontFamily]"
-                :style="{fontSize:scene.fontSize+'px',color:scene.textColor}"
-                v-html="formatText(scene.text)">
+            <div :class="['style-'+scene.textStyle,scene.fontFamily,'pdf-text-content']"
+                :style="{fontSize:scene.fontSize+'px',color:scene.textColor,textAlign:'center'}">
+                {{ scene.text }}
             </div>
         </div>
     </div>
@@ -130,16 +173,18 @@ function store(){
 return{
     scenes:[],
     activeSceneIndex:0,
+    zoomLevel:.5,
     isExporting:false,
+    lastSaved:'',
 
     get activeScene(){return this.scenes[this.activeSceneIndex]||{}},
 
     mounted(){
         const d=localStorage.getItem('storybook_data');
-        this.scenes=d?JSON.parse(d):[this.newScene()];
+        this.scenes=d?JSON.parse(d):[this.createScene()];
     },
 
-    newScene(img=null){
+    createScene(img=null){
         return{
             id:Math.random().toString(36).slice(2),
             image:img,
@@ -155,34 +200,27 @@ return{
     },
 
     addScene(){
-        this.scenes.push(this.newScene());
+        this.scenes.push(this.createScene());
         this.activeSceneIndex=this.scenes.length-1;
-        this.save();
+        this.saveToLocal();
     },
 
-    uploadImages(e){
-        const files=[...e.target.files];
-        files.forEach(f=>{
+    handleBulkUpload(e){
+        [...e.target.files].forEach(f=>{
             const r=new FileReader();
             r.onload=ev=>{
-                this.scenes.push(this.newScene(ev.target.result));
-                this.save();
+                this.scenes.push(this.createScene(ev.target.result));
+                this.saveToLocal();
             };
             r.readAsDataURL(f);
         });
         e.target.value='';
     },
 
-    save(){
+    saveToLocal(){
         localStorage.setItem('storybook_data',JSON.stringify(this.scenes));
-    },
-
-    formatText(t){
-        if(!t) return '';
-        return t.replace(/&/g,"&amp;")
-                .replace(/</g,"&lt;")
-                .replace(/>/g,"&gt;")
-                .replace(/\n/g,"<br>");
+        const n=new Date();
+        this.lastSaved=n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
     },
 
     async exportPDF(){
@@ -198,6 +236,7 @@ return{
         this.isExporting=false;
     },
 
+    /* ✅ PNG (แก้หน้าขาวแล้ว) */
     async exportPNG(){
         if(this.isExporting) return;
         this.isExporting=true;
@@ -205,34 +244,25 @@ return{
         const root=document.getElementById('pdf-export-root');
         const oldStyle=root.getAttribute('style');
 
-        try{
-            // 🔥 ย้ายเข้าหน้าจอ (แก้หน้าขาว)
-            root.setAttribute(
-                'style',
-                'position:relative;left:0;top:0;width:210mm;background:white;z-index:9999'
-            );
+        root.setAttribute('style',
+            'position:relative;left:0;top:0;width:210mm;background:white;z-index:9999');
 
-            await new Promise(r=>setTimeout(r,500));
+        await new Promise(r=>setTimeout(r,500));
 
-            const pages=root.querySelectorAll('.pdf-page');
-
-            for(let i=0;i<pages.length;i++){
-                const canvas=await html2canvas(pages[i],{
-                    scale:3,
-                    useCORS:true,
-                    backgroundColor:'#ffffff'
-                });
-                const a=document.createElement('a');
-                a.download=`storybook-page-${String(i+1).padStart(2,'0')}.png`;
-                a.href=canvas.toDataURL('image/png');
-                a.click();
-                await new Promise(r=>setTimeout(r,300));
-            }
-        }finally{
-            // 🔵 ย้ายกลับไปซ่อน
-            root.setAttribute('style',oldStyle);
-            this.isExporting=false;
+        const pages=root.querySelectorAll('.pdf-page');
+        for(let i=0;i<pages.length;i++){
+            const canvas=await html2canvas(pages[i],{
+                scale:3,useCORS:true,backgroundColor:'#fff'
+            });
+            const a=document.createElement('a');
+            a.download=`storybook-page-${String(i+1).padStart(2,'0')}.png`;
+            a.href=canvas.toDataURL('image/png');
+            a.click();
+            await new Promise(r=>setTimeout(r,300));
         }
+
+        root.setAttribute('style',oldStyle);
+        this.isExporting=false;
     }
 }}
 </script>
