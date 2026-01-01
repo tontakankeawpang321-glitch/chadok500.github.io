@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Storybook Creator - PDF / PNG (Draggable Text)</title>
+    <title>Storybook Creator - PNG Export (Draggable Text)</title>
     
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/petite-vue" defer init></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
@@ -61,13 +60,13 @@
         .text-wrapper:hover { outline: 2px dashed #4f46e5; }
         .text-wrapper:active { outline: 2px solid #4f46e5; cursor: grabbing; }
 
-        /* PDF/PNG Export Styling */
-        .pdf-page {
+        /* PNG Export Styling */
+        .png-page {
             width: 210mm; height: 296.8mm;
-            page-break-after: always; position: relative;
+            position: relative;
             overflow: hidden; background-color: white;
         }
-        .pdf-text-content {
+        .png-text-content {
             word-wrap: break-word; overflow-wrap: break-word;
             white-space: pre-wrap; width: 100%; display: block;
         }
@@ -90,11 +89,9 @@
                 <i class="ph ph-images text-lg"></i> อัปโหลดรูป
                 <input type="file" accept="image/*" multiple class="hidden" @change="handleBulkUpload($event)">
             </label>
-            <button @click="exportPDF" :disabled="isExporting" class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
-                <i class="ph ph-file-pdf text-lg"></i> PDF
-            </button>
-            <button @click="exportPNG" :disabled="isExporting" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
-                <i class="ph ph-image text-lg"></i> PNG
+            <button @click="exportPNG" :disabled="isExporting" class="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-semibold text-sm shadow-md disabled:opacity-50">
+                <span v-if="!isExporting" class="flex items-center gap-2"><i class="ph ph-image text-lg"></i> ส่งออก PNG</span>
+                <span v-else class="flex items-center gap-2"><div class="loader"></div> กำลังสร้าง...</span>
             </button>
         </div>
     </nav>
@@ -169,7 +166,6 @@
                     <button @click="snapPosition('top')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-top"></i></button>
                     <button @click="snapPosition('center')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-center-horizontal"></i></button>
                     <button @click="snapPosition('bottom')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-bottom"></i></button>
-                    <span class="text-[10px] text-gray-400 italic">(ลากที่ข้อความเพื่อย้ายอิสระ)</span>
                 </div>
 
                 <div class="flex items-center gap-2 ml-auto">
@@ -215,13 +211,13 @@
         </main>
     </div>
 
-    <!-- Export Root -->
-    <div id="pdf-export-root" style="position: fixed; left: -10000px; top: 0; width: 210mm;">
-        <div v-for="scene in scenes" :key="'ex-' + scene.id" class="pdf-page" :style="{ backgroundColor: scene.bgColor }">
+    <!-- Export Root (Hidden) -->
+    <div id="export-root" style="position: fixed; left: -10000px; top: 0; width: 210mm;">
+        <div v-for="scene in scenes" :key="'ex-' + scene.id" class="png-page" :style="{ backgroundColor: scene.bgColor }">
             <img v-if="scene.image" :src="scene.image" style="width:100%;height:100%;" :style="{ objectFit: scene.fit }">
             <div style="position: absolute; width: 80%; transform: translate(-50%, -50%);"
                  :style="{ left: scene.textX + '%', top: scene.textY + '%' }">
-                <div :class="['style-' + scene.textStyle, scene.fontFamily, 'pdf-text-content']"
+                <div :class="['style-' + scene.textStyle, scene.fontFamily, 'png-text-content']"
                      style="text-align: center; width: 100%; min-height: 1em;"
                      :style="{ fontSize: scene.fontSize + 'px', color: scene.textColor }">
                     {{ scene.text || '' }}
@@ -265,9 +261,8 @@
 
                 onDragStart(e) {
                     if (e.target.tagName === 'TEXTAREA') {
-                        // เช็คว่ากดที่ตัวอักษรหรือกดขอบเพื่อลาก
                         if (e.ctrlKey || e.metaKey) this.isDragging = true;
-                        return; // ยอมให้พิมพ์ได้ปกติ
+                        return;
                     }
                     this.isDragging = true;
                 },
@@ -276,12 +271,8 @@
                     if (!this.isDragging) return;
                     const page = document.getElementById('editor-page');
                     const rect = page.getBoundingClientRect();
-                    
-                    // คำนวณตำแหน่งเมาส์สัมพันธ์กับหน้ากระดาษ (0-100%)
                     let x = ((e.clientX - rect.left) / rect.width) * 100;
                     let y = ((e.clientY - rect.top) / rect.height) * 100;
-
-                    // จำกัดขอบเขตไม่ให้หลุดหน้า (ขอบ 5%)
                     this.activeScene.textX = Math.max(5, Math.min(95, x));
                     this.activeScene.textY = Math.max(5, Math.min(95, y));
                 },
@@ -358,36 +349,19 @@
                 zoomIn() { if(this.zoomLevel < 1.3) this.zoomLevel += 0.05; },
                 zoomOut() { if(this.zoomLevel > 0.15) this.zoomLevel -= 0.05; },
 
-                async exportPDF() {
-                    if (this.isExporting) return;
-                    this.isExporting = true;
-                    try {
-                        await new Promise(r => setTimeout(r, 800));
-                        const element = document.getElementById('pdf-export-root');
-                        const opt = {
-                            margin: 0, filename: `story-${Date.now()}.pdf`,
-                            image: { type: 'jpeg', quality: 0.98 },
-                            html2canvas: { scale: 2, useCORS: true },
-                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                            pagebreak: { mode: 'css', after: '.pdf-page' }
-                        };
-                        await html2pdf().set(opt).from(element).save();
-                    } finally { this.isExporting = false; }
-                },
-
                 async exportPNG() {
                     if (this.isExporting) return;
                     this.isExporting = true;
-                    const root = document.getElementById('pdf-export-root');
+                    const root = document.getElementById('export-root');
                     const oldStyle = root.getAttribute('style');
                     try {
                         root.setAttribute('style', 'position:relative;left:0;top:0;width:210mm;background:white;z-index:9999');
                         await new Promise(r => setTimeout(r, 600));
-                        const pages = root.querySelectorAll('.pdf-page');
+                        const pages = root.querySelectorAll('.png-page');
                         for(let i = 0; i < pages.length; i++) {
                             const canvas = await html2canvas(pages[i], { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
                             const a = document.createElement('a');
-                            a.download = `page-${String(i+1).padStart(2, '0')}.png`;
+                            a.download = `storybook-page-${String(i+1).padStart(2, '0')}.png`;
                             a.href = canvas.toDataURL('image/png');
                             a.click();
                             await new Promise(r => setTimeout(r, 400));
