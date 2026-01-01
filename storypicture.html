@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Storybook Creator - PNG Export (Draggable Image & Text)</title>
+    <title>Storybook Creator - PNG Export (Draggable Pages)</title>
     
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -31,7 +31,6 @@
             overflow: hidden; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             transform-origin: top center;
             user-select: none;
-            cursor: crosshair; /* Indicate image panning */
         }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -67,12 +66,16 @@
         .text-wrapper:hover { outline: 2px dashed #4f46e5; }
         .text-wrapper:active { outline: 2px solid #4f46e5; cursor: grabbing; }
 
-        .draggable-img {
+        .static-img {
             position: absolute;
             inset: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
+        }
+
+        .drag-over {
+            border-top: 4px solid #4f46e5 !important;
         }
 
         /* PNG Export Styling */
@@ -113,7 +116,7 @@
 
     <div class="flex h-[calc(100vh-64px)] overflow-hidden">
         
-        <!-- Left Sidebar -->
+        <!-- Left Sidebar: Reorderable List -->
         <aside class="w-64 bg-white border-r flex flex-col z-10 shrink-0">
             <div class="p-3 bg-gray-50 border-b font-semibold text-gray-500 text-sm flex justify-between items-center">
                 <span>หน้านิทาน ({{ scenes.length }})</span>
@@ -121,8 +124,16 @@
             <div class="flex-1 overflow-y-auto p-2 space-y-2 no-scrollbar">
                 <div v-for="(scene, index) in scenes" :key="scene.id"
                     @click="activeSceneIndex = index"
+                    draggable="true"
+                    @dragstart="onSidebarDragStart(index, $event)"
+                    @drop="onSidebarDrop(index)"
+                    @dragover.prevent
+                    @dragenter="dragEnterIndex = index"
                     class="p-2 rounded-lg cursor-pointer border-2 transition group relative"
-                    :class="activeSceneIndex === index ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                    :class="[
+                        activeSceneIndex === index ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300',
+                        dragEnterIndex === index ? 'drag-over' : ''
+                    ]">
                     <div class="flex justify-between items-center mb-1">
                         <span class="text-xs font-bold text-gray-400">#{{ index + 1 }}</span>
                         <button @click.stop="deleteScene(index)" class="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded transition">
@@ -131,7 +142,7 @@
                     </div>
                     <div class="aspect-[210/297] bg-white rounded border overflow-hidden relative shadow-sm pointer-events-none">
                         <div class="absolute inset-0" :style="{ backgroundColor: scene.bgColor }"></div>
-                        <img v-if="scene.image" :src="scene.image" class="absolute inset-0 w-full h-full object-cover" :style="{ objectPosition: scene.imgX + '% ' + scene.imgY + '%' }">
+                        <img v-if="scene.image" :src="scene.image" class="absolute inset-0 w-full h-full object-cover">
                         <div v-else class="absolute inset-0 flex items-center justify-center text-gray-200">
                             <i class="ph ph-image text-2xl"></i>
                         </div>
@@ -151,10 +162,9 @@
                 <div class="flex items-center gap-2 border-r pr-4">
                     <span class="text-gray-400 font-bold uppercase text-[10px]">รูปพื้นหลัง</span>
                     <label class="cursor-pointer bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition font-medium">เปลี่ยนรูป<input type="file" accept="image/*" class="hidden" @change="handleSingleImageReplace($event)"></label>
-                    <button @click="resetImagePos" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200" title="รีเซ็ตตำแหน่งรูป"><i class="ph ph-arrows-counter-clockwise"></i></button>
                     <select v-model="activeScene.fit" @change="saveToLocal" class="border rounded px-1 py-1.5 bg-gray-50">
-                        <option value="cover">Crop (ลากได้)</option>
-                        <option value="contain">Fit</option>
+                        <option value="cover">เต็มหน้า (Crop)</option>
+                        <option value="contain">พอดีหน้า (Fit)</option>
                     </select>
                 </div>
 
@@ -190,7 +200,7 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <span class="text-gray-400 font-bold uppercase text-[10px]">ย้ายด่วน</span>
+                    <span class="text-gray-400 font-bold uppercase text-[10px]">ตำแหน่งข้อความ</span>
                     <button @click="snapPosition('top')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-top"></i></button>
                     <button @click="snapPosition('center')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-center-horizontal"></i></button>
                     <button @click="snapPosition('bottom')" class="p-1.5 bg-gray-100 rounded hover:bg-gray-200"><i class="ph ph-align-bottom"></i></button>
@@ -200,15 +210,11 @@
             <!-- Canvas Area -->
             <div class="flex-1 overflow-auto flex justify-center py-12 px-4 scroll-smooth">
                 <div id="editor-page" class="a4-page shadow-2xl transition-all duration-300"
-                    @mousedown="onPageMouseDown"
                     :style="{ transform: 'scale(' + zoomLevel + ')', backgroundColor: activeScene.bgColor }">
                     
-                    <!-- Background Image (Draggable via Page) -->
-                    <img v-if="activeScene.image" :src="activeScene.image" class="draggable-img" 
-                        :style="{ 
-                            objectFit: activeScene.fit, 
-                            objectPosition: activeScene.imgX + '% ' + activeScene.imgY + '%' 
-                        }">
+                    <!-- Background Image (Non-draggable) -->
+                    <img v-if="activeScene.image" :src="activeScene.image" class="static-img" 
+                        :style="{ objectFit: activeScene.fit }">
                     
                     <!-- Draggable Text Wrapper -->
                     <div class="text-wrapper" 
@@ -246,7 +252,7 @@
     <div id="export-root" style="position: fixed; left: -10000px; top: 0; width: 210mm;">
         <div v-for="scene in scenes" :key="'ex-' + scene.id" class="png-page" :style="{ backgroundColor: scene.bgColor }">
             <img v-if="scene.image" :src="scene.image" style="width:100%;height:100%;" 
-                :style="{ objectFit: scene.fit, objectPosition: scene.imgX + '% ' + scene.imgY + '%' }">
+                :style="{ objectFit: scene.fit }">
             <div style="position: absolute; transform: translate(-50%, -50%);"
                  :style="{ left: scene.textX + '%', top: scene.textY + '%', width: scene.textWidth + '%' }">
                 <div :class="['style-' + scene.textStyle, scene.fontFamily, 'png-text-content']"
@@ -267,7 +273,12 @@
                 isExporting: false,
                 lastSaved: '',
                 
-                dragMode: null, // 'text' or 'image'
+                // Sidebar Reordering
+                draggedPageIndex: null,
+                dragEnterIndex: null,
+
+                // Text Dragging
+                isTextDragging: false,
                 dragStartPos: { x: 0, y: 0 },
                 dragStartVal: { x: 0, y: 0 },
 
@@ -291,60 +302,58 @@
                         image: image, text: "", fit: 'cover', fontSize: 32,
                         textColor: '#000000', bgColor: '#ffffff', textStyle: 'none', 
                         fontFamily: 'font-sarabun', 
-                        textX: 50, textY: 85, textWidth: 80,
-                        imgX: 50, imgY: 50 // Image Panning
+                        textX: 50, textY: 85, textWidth: 80
                     };
                 },
 
-                // Dragging Logic
+                // Sidebar Reorder Logic
+                onSidebarDragStart(index, event) {
+                    this.draggedPageIndex = index;
+                    event.dataTransfer.effectAllowed = 'move';
+                },
+
+                onSidebarDrop(index) {
+                    if (this.draggedPageIndex !== null && this.draggedPageIndex !== index) {
+                        const item = this.scenes.splice(this.draggedPageIndex, 1)[0];
+                        this.scenes.splice(index, 0, item);
+                        this.activeSceneIndex = index;
+                        this.saveToLocal();
+                    }
+                    this.draggedPageIndex = null;
+                    this.dragEnterIndex = null;
+                },
+
+                // Text Dragging Logic
                 onTextDragStart(e) {
                     if (e.target.tagName === 'TEXTAREA') {
                         if (e.ctrlKey || e.metaKey) {
-                            this.dragMode = 'text';
+                            this.isTextDragging = true;
                         } else return;
                     } else {
-                        this.dragMode = 'text';
+                        this.isTextDragging = true;
                     }
                     this.dragStartPos = { x: e.clientX, y: e.clientY };
                     this.dragStartVal = { x: this.activeScene.textX, y: this.activeScene.textY };
                 },
 
-                onPageMouseDown(e) {
-                    if (this.dragMode) return;
-                    this.dragMode = 'image';
-                    this.dragStartPos = { x: e.clientX, y: e.clientY };
-                    this.dragStartVal = { x: this.activeScene.imgX, y: this.activeScene.imgY };
-                },
-
                 onGlobalMouseMove(e) {
-                    if (!this.dragMode) return;
+                    if (!this.isTextDragging) return;
                     
                     const page = document.getElementById('editor-page');
                     const rect = page.getBoundingClientRect();
                     const dx = ((e.clientX - this.dragStartPos.x) / rect.width) * 100;
                     const dy = ((e.clientY - this.dragStartPos.y) / rect.height) * 100;
 
-                    if (this.dragMode === 'text') {
-                        this.activeScene.textX = Math.max(0, Math.min(100, this.dragStartVal.x + dx));
-                        this.activeScene.textY = Math.max(0, Math.min(100, this.dragStartVal.y + dy));
-                    } else if (this.dragMode === 'image') {
-                        // Invert image dragging direction to feel like "panning"
-                        this.activeScene.imgX = Math.max(0, Math.min(100, this.dragStartVal.x - dx));
-                        this.activeScene.imgY = Math.max(0, Math.min(100, this.dragStartVal.y - dy));
-                    }
+                    this.activeScene.textX = Math.max(0, Math.min(100, this.dragStartVal.x + dx));
+                    this.activeScene.textY = Math.max(0, Math.min(100, this.dragStartVal.y + dy));
                 },
 
                 onGlobalMouseUp() {
-                    if (this.dragMode) {
-                        this.dragMode = null;
+                    if (this.isTextDragging) {
+                        this.isTextDragging = false;
                         this.saveToLocal();
                     }
-                },
-
-                resetImagePos() {
-                    this.activeScene.imgX = 50;
-                    this.activeScene.imgY = 50;
-                    this.saveToLocal();
+                    this.dragEnterIndex = null;
                 },
 
                 snapPosition(pos) {
@@ -396,19 +405,18 @@
 
                 saveToLocal() {
                     try {
-                        localStorage.setItem('storybook_v4_data', JSON.stringify(this.scenes));
+                        localStorage.setItem('storybook_v5_data', JSON.stringify(this.scenes));
                         const now = new Date();
                         this.lastSaved = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
                     } catch(e) {}
                 },
 
                 loadFromLocal() {
-                    const data = localStorage.getItem('storybook_v4_data');
+                    const data = localStorage.getItem('storybook_v5_data') || localStorage.getItem('storybook_v4_data');
                     if (data) {
                         try { 
-                            const parsed = JSON.parse(data);
-                            // migration for old data
-                            this.scenes = parsed.map(s => ({ imgX: 50, imgY: 50, ...s }));
+                            this.scenes = JSON.parse(data);
+                            if (this.scenes.length === 0) this.addScene();
                         } catch(e) { this.addScene(); }
                     } else this.addScene();
                 },
@@ -425,7 +433,6 @@
                         for(let i = 0; i < pages.length; i++) {
                             const canvas = await html2canvas(pages[i], { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
                             const a = document.createElement('a');
-                            // Naming 001 - 100
                             const fileName = String(i + 1).padStart(3, '0');
                             a.download = `${fileName}.png`;
                             a.href = canvas.toDataURL('image/png');
@@ -440,7 +447,7 @@
                 
                 clearAll() {
                     if(confirm('ล้างข้อมูลทั้งหมด?')) {
-                        localStorage.removeItem('storybook_v4_data');
+                        localStorage.removeItem('storybook_v5_data');
                         this.scenes = [this.createScene()];
                         this.activeSceneIndex = 0;
                         this.lastSaved = '';
