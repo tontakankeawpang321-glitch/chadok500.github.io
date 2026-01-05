@@ -341,8 +341,8 @@
 
     <script>
         const apiKey = "AIzaSyAgXgxYnjHNSl-zfvLWEcHS0b6mmoI9o48"; // System will provide API Key
-        const IMAGE_MODEL = "gemini-2.5-flash-image"; // Reverted to stable 3.0
-        const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025"; // Fixed typo (was 3flash)
+        const IMAGE_MODEL = "gemini-2.5-flash-image-preview"; // Updated Model
+        const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
         
         let generatedScenesData = [];
         let currentStoryText = "";
@@ -656,17 +656,21 @@
             imgEl.classList.remove('loaded');
 
             try {
+                // Update Payload for Gemini 2.5 Flash Image Preview
                 const imagePayload = {
-                    instances: [{ prompt: prompt }],
-                    parameters: { sampleCount: 1, aspectRatio: "3:4" }
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseModalities: ["IMAGE"] }
                 };
                 
-                // FORCE USE IMAGEN 3.0
-                const imageUrl = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:predict?key=${apiKey}`;
+                // Update URL for Gemini 2.5 Flash Image Preview
+                const imageUrl = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${apiKey}`;
+                
                 const imageData = await apiRequest(imageUrl, imagePayload, 5, updateLoaderText);
 
-                if (imageData && imageData.predictions?.[0]) {
-                    const base64Str = imageData.predictions[0].bytesBase64Encoded;
+                // Update Response extraction for Gemini
+                const base64Str = imageData.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+
+                if (base64Str) {
                     
                     // Store Data
                     const existingIndex = generatedScenesData.findIndex(item => item.name.includes(`scene-${String(sceneIdx).padStart(2, '0')}`));
@@ -835,4 +839,3 @@
     </script>
 </body>
 </html>
-
